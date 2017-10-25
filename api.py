@@ -37,7 +37,7 @@ api.add_resource(Catalog, '/catalog')
 
 if __name__ == '__main__':
     global catalog
-    json.loads(os.path.join(
+    json.load(os.path.join(
         '/root', 'astrocats', 'astrocats', 'tidaldisruptions', 'output',
         'catalog.min.json'))
     app.run()
