@@ -1,34 +1,43 @@
-from flask import Flask, request
-from flask_restful import Resource, Api
+"""API for the Open Astronomy Catalogs."""
 import json
+import os
 
-#Create a engine for connecting to SQLite3.
-#Assuming salaries.db is in your app root folder
+from flask import Flask
+from flask_restful import Api, Resource
+
+# Create a engine for connecting to SQLite3.
+# Assuming salaries.db is in your app root folder
 
 app = Flask(__name__)
 api = Api(app)
 
-class Departments_Meta(Resource):
-    def get(self):
-        #Connect to databse
-        conn = e.connect()
-        #Perform query and return JSON data
-        query = conn.execute("select distinct DEPARTMENT from salaries")
-        return {'departments': [i[0] for i in query.cursor.fetchall()]}
 
-class Departmental_Salary(Resource):
-    def get(self, department_name):
-        conn = e.connect()
-        query = conn.execute("select * from salaries where Department='%s'"%department_name.upper())
-        #Query the result and get cursor.Dumping that data to a JSON is looked by extension
-        result = {'data': [dict(zip(tuple (query.keys()) ,i)) for i in query.cursor]}
-        return result
-        #We can have PUT,DELETE,POST here. But in our API GET implementation is sufficient
- 
-api.add_resource(Departmental_Salary, '/dept/<string:department_name>')
-api.add_resource(Departments_Meta, '/departments')
+class Catalog(Resource):
+    """Return whole catalog."""
+
+    global catalog
+
+    def get(self):
+        """Get result."""
+        return catalog
+
+
+class Event(Resource):
+    """Return single event."""
+
+    global catalog
+
+    def get(self, event_name):
+        """Get result."""
+        return catalog.get(event_name, {})
+
+
+api.add_resource(Event, '/event/<string:event_name>')
+api.add_resource(Catalog, '/catalog')
 
 if __name__ == '__main__':
     global catalog
-    c
+    json.loads(os.path.join(
+        '/root', 'astrocats', 'astrocats', 'tidaldisruptions', 'output',
+        'catalog.min.json'))
     app.run()
