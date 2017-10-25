@@ -44,14 +44,21 @@ class Catalog(Resource):
 class FullEvent(Resource):
     """Return single event."""
 
-    def get(self, catalog_name, event_name, attribute=None):
-        return Event().get(catalog_name, event_name, attribute, True)
+    def get(self, catalog_name, event_name, quantity_name=None):
+        return Event().get(catalog_name, event_name, quantity_name, None, True)
+
+
+class ValueEvent(Resource):
+    """Return single event."""
+
+    def get(self, catalog_name, event_name, quantity_name=None, attribute_name='value', item=0):
+        return Event().get(catalog_name, event_name, quantity_name, attribute_name, item)
 
 
 class Event(Resource):
     """Return single event."""
 
-    def get(self, catalog_name, event_name, attribute=None, full=False):
+    def get(self, catalog_name, event_name, quantity_name=None, attribute_name=None, item=None, full=False):
         """Get result."""
         my_cat = None
         event = None
@@ -72,19 +79,27 @@ class Event(Resource):
         if not my_cat:
             return {}
 
-        if attribute and not full and catalogs[my_cat].get(event_name, {}).get(attribute):
-            return catalogs[my_cat][event_name][attribute]
+        if quantity_name and not full and catalogs[my_cat].get(event_name, {}).get(quantity_name):
+            quantity = catalogs[my_cat][event_name][quantity_name]
+            if attribute_name is not None and item is not None and attribute_name in quantity[item]:
+                return quantity[item][attribute_name]
+            else:
+                return quantity
 
         event = json.load(open(os.path.join(
             ac_path, catdict[my_cat], 'output', 'json',
             get_filename(event_name)), 'r'))
 
-        if not attribute:
+        if not quantity_name:
             if event:
                 return event
         else:
             name = list(event.keys())[0]
-            return(event[name].get(attribute, {}))
+            quantity = event[name].get(quantity_name, {})
+            if attribute_name is not None and quantity_name in quantity[attribute_name]:
+                return quantity[attribute_name][quantity_name]
+            else:
+                return quantity
 
         return {}
 
@@ -92,9 +107,12 @@ class Event(Resource):
 api.add_resource(Catalogs, '/<string:catalog_name>/catalogs')
 api.add_resource(Catalog, '/<string:catalog_name>/catalog')
 api.add_resource(Event, '/<string:catalog_name>/event/<string:event_name>',
-    '/<string:catalog_name>/event/<string:event_name>/<string:attribute>')
+    '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>')
 api.add_resource(FullEvent, '/<string:catalog_name>/event/<string:event_name>/full',
-    '/<string:catalog_name>/event/<string:event_name>/<string:attribute>/full')
+    '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>/full')
+api.add_resource(ValueEvent, '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>/<string:attribute_name>',
+    '/<string:catalog_name>/event/<string:event_name>'
+    '/<string:quantity_name>/<string:attribute_name>/<int:item>')
 
 if __name__ == '__main__':
     print('Loading catalog...')
@@ -102,4 +120,4 @@ if __name__ == '__main__':
         catalogs[cat] = json.load(open(os.path.join(
             ac_path, catdict[cat], 'output', 'catalog.min.json'), 'r'))
         catalogs[cat] = dict(zip([x['name'] for x in catalogs[cat]], catalogs[cat]))
-    app.run()
+    app.run(threaded=True)
