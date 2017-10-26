@@ -62,8 +62,9 @@ class Event(Resource):
         # Options
         fmt = request.values.get('format')
         mjd = request.values.get('mjd')
+        incomplete = request.values.get('incomplete')
 
-        print(fmt, attribute_name)
+        print(fmt, attribute_name, incomplete)
 
         # Attributes
         attribute_names = None
@@ -92,7 +93,7 @@ class Event(Resource):
             quantity = catalogs[my_cat][event_name][quantity_name]
             if attribute_names is None:
                 return quantity
-            return self.get_attributes(attribute_names, quantity, fmt)
+            return self.get_attributes(attribute_names, quantity, fmt, incomplete)
 
         # When using the full data
         event = json.load(open(os.path.join(
@@ -107,20 +108,23 @@ class Event(Resource):
             quantity = event[name].get(quantity_name, {})
             if attribute_names is None:
                 return quantity
-            return self.get_attributes(attribute_names, quantity, fmt)
+            return self.get_attributes(attribute_names, quantity, fmt, incomplete)
 
         return {}
 
-    def get_attributes(self, anames, quantity, fmt='json'):
+    def get_attributes(self, anames, quantity, fmt='json', incomplete=None):
         if len(anames) == 1:
             attributes = [x.get(anames[0]) for x in quantity if x.get(anames[0]) is not None]
         else:
-            attributes = [[x.get(a) for a in anames] for x in quantity if all([x.get(a) is not None for a in anames])]
+            if incomplete is not None:
+                attributes = [[x.get(a, '') for a in anames] for x in quantity if any([x.get(a) is not None for a in anames])]
+            else:
+                attributes = [[x.get(a) for a in anames] for x in quantity if all([x.get(a) is not None for a in anames])]
 
         if fmt == 'csv':
-            return Response('\n'.join([','.join(x) for x in attributes]), mimetype='text/plain')
+            return Response('\n'.join([','.join(anames)] + [','.join(x) for x in attributes]), mimetype='text/plain')
         if fmt == 'tsv':
-            return Response('\n'.join(['\t'.join(x) for x in attributes]), mimetype='text/plain')
+            return Response('\n'.join(['\t'.join(anames)] + ['\t'.join(x) for x in attributes]), mimetype='text/plain')
 
         return attributes
 
