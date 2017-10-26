@@ -40,6 +40,10 @@ https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band
 
 https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?format=csv
 
+#### Include observations that contain at least one of the requested fields (rather than all)
+
+https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?format=csv&incomplete
+
 #### Return the spectrum closest to the listed MJD (not functional)
 
 https://astrocats.space/api/SN2014J/spectra?mjd~55500
