@@ -10,7 +10,7 @@ https://tde.space/api/
 
 https://kilonova.space/api/
 
-where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the astrocats.space route.
+where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided.
 
 ## Catalog queries
 
@@ -33,3 +33,7 @@ https://astrocats.space/api/event/SN2014J/redshift?item=0
 #### Return all photometric observations with a magnitude, magnitude error, and band listed
 
 https://astrocats.space/api/event/SN2014J/photometry/magnitude+e_magnitude+band
+
+#### Return the above in CSV format
+
+https://astrocats.space/api/event/SN2014J/photometry/magnitude+e_magnitude+band?format=csv
