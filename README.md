@@ -26,20 +26,20 @@ Individual event queries can return more-detailed information about each event, 
 
 #### Get the available redshift values for an event
 
-https://astrocats.space/api/event/SN2014J/redshift
+https://astrocats.space/api/SN2014J/redshift
 
 #### Select the first (preferred) value of the redshift
 
-https://astrocats.space/api/event/SN2014J/redshift?item=0
+https://astrocats.space/api/SN2014J/redshift?item=0
 
 #### Return all photometric observations with a magnitude, magnitude error, and band listed
 
-https://astrocats.space/api/event/SN2014J/photometry/magnitude+e_magnitude+band
+https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band
 
 #### Return the above in CSV format
 
-https://astrocats.space/api/event/SN2014J/photometry/magnitude+e_magnitude+band?format=csv
+https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?format=csv
 
 #### Return the spectrum closest to the listed MJD (not functional)
 
-https://astrocats.space/api/event/SN2014J/spectra?mjd~55500
+https://astrocats.space/api/SN2014J/spectra?mjd~55500
