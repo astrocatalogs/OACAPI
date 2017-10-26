@@ -1,14 +1,13 @@
 """API for the Open Astronomy Catalogs."""
 import json
 import os
-
 from collections import OrderedDict
-from flask import Flask, make_response, Response
-from flask_restful import Api, Resource
-from flask_compress import Compress
 
-from flask import request
 from werkzeug.contrib.fixers import ProxyFix
+
+from flask import Flask, Response, request
+from flask_compress import Compress
+from flask_restful import Api, Resource
 
 # Create a engine for connecting to SQLite3.
 # Assuming salaries.db is in your app root folder
@@ -29,8 +28,11 @@ aliases = OrderedDict()
 
 ac_path = os.path.join('/root', 'astrocats', 'astrocats')
 
+
 def get_filename(name):
+    """Return filename for astrocats event."""
     return name.replace('/', '_') + '.json'
+
 
 class Info(Resource):
     """Return basic info about catalog."""
@@ -41,7 +43,10 @@ class Info(Resource):
         """Return HTML page."""
         route_msg = ''
         if catalog_name != 'astrocats':
-            route_msg = 'For this particular route, events from the "{}" catalog will be matched against first.'.format(catdict.get(catalog_name))
+            route_msg = (
+                'For this particular route, events from the "{}" '
+                'catalog will be matched against first.').format(
+                catdict.get(catalog_name))
         itxt = self._infotxt.replace('$ROUTE_MSG', route_msg)
         return Response(itxt, mimetype='text/html')
 
@@ -52,6 +57,7 @@ class Catalogs(Resource):
     def get(self, catalog_name):
         """Get result."""
         return catalogs
+
 
 class Catalog(Resource):
     """Return whole catalog."""
@@ -64,13 +70,15 @@ class FullEvent(Resource):
     """Return single event."""
 
     def get(self, catalog_name, event_name, quantity_name=None):
+        """Pass-through to `Event` with `full = True`."""
         return Event().get(catalog_name, event_name, quantity_name, None, True)
 
 
 class Event(Resource):
     """Return single event."""
 
-    def get(self, catalog_name, event_name=None, quantity_name=None, attribute_name=None, full=False):
+    def get(self, catalog_name, event_name=None, quantity_name=None,
+            attribute_name=None, full=False):
         """Get result."""
         event = None
         use_full = False
@@ -125,7 +133,8 @@ class Event(Resource):
                             my_cat, my_event = tuple(opt)
                 qdict = OrderedDict()
                 for quantity in quantity_names:
-                    qdict[quantity] = catalogs.get(my_cat, {}).get(my_event, {}).get(quantity, {})
+                    qdict[quantity] = catalogs.get(my_cat, {}).get(
+                        my_event, {}).get(quantity, {})
                     if qdict[quantity] != {}:
                         have_quantity = True
                 new_dict[event] = qdict
@@ -151,8 +160,10 @@ class Event(Resource):
                             my_cat, my_event = tuple(opt)
                 qdict = OrderedDict()
                 for quantity in quantity_names:
-                    my_quantity = catalogs.get(my_cat, {}).get(my_event, {}).get(quantity, {})
-                    qdict[quantity] = self.get_attributes(attribute_names, my_quantity, fmt, incomplete)
+                    my_quantity = catalogs.get(my_cat, {}).get(
+                        my_event, {}).get(quantity, {})
+                    qdict[quantity] = self.get_attributes(
+                        attribute_names, my_quantity, fmt, incomplete)
                 new_dict[event] = qdict
 
             if fmt in ['csv', 'tsv']:
@@ -169,9 +180,11 @@ class Event(Resource):
                     if len(quantity_names) > 1:
                         cax = 'q'
                         if len(attribute_names) > 1:
-                            return Response('{} not supported for this query type.'.format(fmt.upper()), mimetype='text/plain')
-                    elif len(attribute_names) > 1:
-                        cax = 'a'
+                            return Response(
+                                '{} not supported for this query type.'.format(
+                                    fmt.upper()), mimetype='text/plain')
+                        elif len(attribute_names) > 1:
+                            cax = 'a'
                 elif len(quantity_names) > 1:
                     rax = 'q'
                     if len(attribute_names) > 1:
@@ -200,23 +213,36 @@ class Event(Resource):
                 print(new_dict)
                 if rax == 'e':
                     if cax == 'q':
-                        outarr = [[new_dict[e].get(q, '') for q in new_dict[e]] for e in new_dict]
-                        outarr = [[q[0] if len(q) == 1 else delim.join(q) for q in e] for e in outarr]
+                        outarr = [
+                            [new_dict[e].get(q, '') for q in new_dict[
+                                e]] for e in new_dict]
+                        outarr = [[q[0] if len(q) == 1 else delim.join(
+                            q) for q in e] for e in outarr]
                     else:
-                        outarr = [[i for s in new_dict[e][quantity_name] for i in s] for e in new_dict]
+                        outarr = [[i for s in new_dict[e][quantity_name]
+                                   for i in s] for e in new_dict]
                 elif rax == 'q':
                     if cax == 'a':
-                        print([len(new_dict[event_name][x]) for x in new_dict[event_name]])
-                        outarr = [[i for s in new_dict[event_name][x] for i in s] if len(new_dict[event_name][x]) == 1 else [
-                            delim.join(i) for i in list(map(list, zip(*new_dict[event_name][x])))] for x in new_dict[event_name]]
+                        print([len(new_dict[event_name][x])
+                               for x in new_dict[event_name]])
+                        outarr = [
+                            [i for s in new_dict[event_name][x] for i in s]
+                            if len(new_dict[event_name][x]) == 1 else [
+                                delim.join(i) for i in list(map(
+                                    list, zip(*new_dict[event_name][x])))]
+                            for x in new_dict[event_name]]
                     else:
-                        outarr = [new_dict[event_name][x] if len(new_dict[event_name][x]) == 1 else [delim.join(new_dict[event_name][x])] for x in new_dict[event_name]]
+                        outarr = [new_dict[event_name][x] if len(
+                            new_dict[event_name][x]) == 1 else [
+                            delim.join(new_dict[event_name][x])]
+                            for x in new_dict[event_name]]
                 elif rax == 'a':
                     outarr = new_dict[event_name][quantity_name]
                 else:
                     return new_dict[event_name][quantity_name]
 
-                outarr = [[('"' + x + '"') if delim in x else x for x in y] for y in outarr]
+                outarr = [[('"' + x + '"') if delim in x else x for x in y]
+                          for y in outarr]
 
                 if rax is not None and cax is None:
                     cax = rax
@@ -231,7 +257,8 @@ class Event(Resource):
                     for i, row in enumerate(outarr):
                         outarr[i].insert(0, rowheaders[i])
 
-                return Response('\n'.join([delim.join(y) for y in outarr]), mimetype='text/plain')
+                return Response('\n'.join(
+                    [delim.join(y) for y in outarr]), mimetype='text/plain')
 
             return new_dict
 
@@ -261,28 +288,37 @@ class Event(Resource):
             quantity = event[name].get(quantity_name, {})
             if attribute_name is None:
                 return quantity
-            return self.get_attributes(attribute_names, quantity, fmt, incomplete)
+            return self.get_attributes(
+                attribute_names, quantity, fmt, incomplete)
 
         return {}
 
     def get_attributes(self, anames, quantity, fmt='json', incomplete=None):
+        """Return array of attributes."""
         if len(anames) == 1:
-            attributes = [x.get(anames[0]) for x in quantity if x.get(anames[0]) is not None]
+            attributes = [x.get(anames[0])
+                          for x in quantity if x.get(anames[0]) is not None]
         else:
             if incomplete is not None:
-                attributes = [[x.get(a, '') for a in anames] for x in quantity if any([x.get(a) is not None for a in anames])]
+                attributes = [
+                    [x.get(a, '') for a in anames] for x in quantity if any(
+                        [x.get(a) is not None for a in anames])]
             else:
-                attributes = [[x.get(a) for a in anames] for x in quantity if all([x.get(a) is not None for a in anames])]
+                attributes = [
+                    [x.get(a) for a in anames] for x in quantity if all(
+                        [x.get(a) is not None for a in anames])]
 
         return attributes
 
 
 api.add_resource(Info, '/<string:catalog_name>/')
 api.add_resource(Catalogs, '/<string:catalog_name>/catalogs')
-api.add_resource(FullEvent,
+api.add_resource(
+    FullEvent,
     '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>',
     '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>/<string:attribute_name>')
-api.add_resource(Event,
+api.add_resource(
+    Event,
     '/<string:catalog_name>/catalog',
     '/<string:catalog_name>/<string:event_name>',
     '/<string:catalog_name>/<string:event_name>/<string:quantity_name>',
@@ -294,7 +330,8 @@ if __name__ == '__main__':
         catalogs[cat] = json.load(open(os.path.join(
             ac_path, catdict[cat], 'output', 'catalog.min.json'), 'r'),
             object_pairs_hook=OrderedDict)
-        catalogs[cat] = dict(zip([x['name'] for x in catalogs[cat]], catalogs[cat]))
+        catalogs[cat] = dict(zip([x['name']
+                                  for x in catalogs[cat]], catalogs[cat]))
     print('Creating alias dictionary...')
     for cat in catdict:
         for event in catalogs[cat]:
