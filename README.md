@@ -40,4 +40,4 @@ https://astrocats.space/api/event/SN2014J/photometry/magnitude+e_magnitude+band?
 
 #### Return the spectrum closest to the listed MJD
 
-https://astrocats.space/api/event/SN2014J/spectra/mjd=55500
+https://astrocats.space/api/event/SN2014J/spectra?mjd=55500
