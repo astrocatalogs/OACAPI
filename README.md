@@ -37,3 +37,7 @@ https://astrocats.space/api/event/SN2014J/photometry/magnitude+e_magnitude+band
 #### Return the above in CSV format
 
 https://astrocats.space/api/event/SN2014J/photometry/magnitude+e_magnitude+band?format=csv
+
+#### Return the spectrum closest to the listed MJD
+
+https://astrocats.space/api/event/SN2014J/spectra/mjd=55500
