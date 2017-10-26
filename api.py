@@ -3,9 +3,11 @@ import json
 import os
 
 from collections import OrderedDict
-from flask import Flask
+from flask import Flask, make_response, Response
 from flask_restful import Api, Resource
 from flask_compress import Compress
+
+from flask import request
 
 # Create a engine for connecting to SQLite3.
 # Assuming salaries.db is in your app root folder
@@ -45,26 +47,23 @@ class Catalog(Resource):
 class FullEvent(Resource):
     """Return single event."""
 
-    def get(self, catalog_name, event_name, quantity_name=None, options=''):
-        return Event().get(catalog_name, event_name, quantity_name, None, options, True)
+    def get(self, catalog_name, event_name, quantity_name=None):
+        return Event().get(catalog_name, event_name, quantity_name, None, True)
 
 
 class Event(Resource):
     """Return single event."""
 
-    def get(self, catalog_name, event_name, quantity_name=None, attribute_name=None, full=False, options=''):
+    def get(self, catalog_name, event_name, quantity_name=None, attribute_name=None, full=False):
         """Get result."""
         my_cat = None
         event = None
 
         # Options
-        option_arr = list(filter(None, options.split('&')))
-        option_arr = [x.split('=') for x in option_arr]
-        option_arr = [tuple(option_arr[i] + [None]) if len(x) == 1 else tuple(option_arr[i]) for i, x in enumerate(option_arr)]
-        options = OrderedDict(option_arr)
+        fmt = request.values.get('format')
+        mjd = request.values.get('mjd')
 
-        fmt = options.get('format', 'json')
-        mjd = options.get('mjd')
+        print(fmt, attribute_name)
 
         # Attributes
         attribute_names = None
@@ -93,7 +92,7 @@ class Event(Resource):
             quantity = catalogs[my_cat][event_name][quantity_name]
             if attribute_names is None:
                 return quantity
-            return self.get_attributes(attribute_names, quantity)
+            return self.get_attributes(attribute_names, quantity, fmt)
 
         # When using the full data
         event = json.load(open(os.path.join(
@@ -108,28 +107,33 @@ class Event(Resource):
             quantity = event[name].get(quantity_name, {})
             if attribute_names is None:
                 return quantity
-            return self.get_attributes(attribute_names, quantity)
+            return self.get_attributes(attribute_names, quantity, fmt)
 
         return {}
 
-    def get_attributes(self, anames, quantity):
+    def get_attributes(self, anames, quantity, fmt='json'):
         if len(anames) == 1:
-            return [x.get(anames[0]) for x in quantity if x.get(anames[0]) is not None]
+            attributes = [x.get(anames[0]) for x in quantity if x.get(anames[0]) is not None]
         else:
-            return [[x.get(a) for a in anames] for x in quantity if all([x.get(a) is not None for a in anames])]
+            attributes = [[x.get(a) for a in anames] for x in quantity if all([x.get(a) is not None for a in anames])]
+
+        if fmt == 'csv':
+            return Response('\n'.join([','.join(x) for x in attributes]), mimetype='text/plain')
+        if fmt == 'tsv':
+            return Response('\n'.join(['\t'.join(x) for x in attributes]), mimetype='text/plain')
+
+        return attributes
 
 
 api.add_resource(Catalogs, '/<string:catalog_name>/catalogs')
 api.add_resource(Catalog, '/<string:catalog_name>/catalog')
 api.add_resource(FullEvent,
-    '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>?<string:options>',
-    '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>/<string:attribute_name>?<string:options>')
+    '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>',
+    '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>/<string:attribute_name>')
 api.add_resource(Event,
     '/<string:catalog_name>/event/<string:event_name>',
     '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>',
-    '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>?<string:options>',
-    '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>/<string:attribute_name>',
-    '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>/<string:attribute_name>?<string:options>')
+    '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>/<string:attribute_name>')
 
 if __name__ == '__main__':
     print('Loading catalog...')
