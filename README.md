@@ -14,9 +14,11 @@ where the only difference is preference in catalog when returning items that app
 
 ## Catalog queries
 
-Whole catalog queries are used to find several objects that correspond to a given query, below we demonstrate a cone search about a set of coordinates:
+Whole catalog queries are used to find several objects that correspond to a given query. A few examples:
 
-https://astrocats.space/api/catalog/sne/?ra=12:12:12&dec:+33:33:33&
+#### Cone search about a set of coordinates (not functional yet)
+
+https://astrocats.space/api/catalog/sne/?ra=12:12:12&dec:+33:33:33&radius=2
 
 ## Event queries
 
