@@ -8,11 +8,13 @@ from flask_restful import Api, Resource
 from flask_compress import Compress
 
 from flask import request
+from werkzeug.contrib.fixers import ProxyFix
 
 # Create a engine for connecting to SQLite3.
 # Assuming salaries.db is in your app root folder
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app)
 Compress(app)
 api = Api(app)
 
@@ -71,12 +73,15 @@ class Event(Resource):
     def get(self, catalog_name, event_name=None, quantity_name=None, attribute_name=None, full=False):
         """Get result."""
         event = None
+        use_full = False
 
         # Options
         fmt = request.values.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
-        if fmt in ['csv', 'tsv'] and attribute_name is None:
-            return Response('{} not supported for this query type.'.format(fmt.upper()), mimetype='text/plain')
+        if fmt == 'csv':
+            delim = ','
+        elif fmt == 'tsv':
+            delim = '\t'
 
         mjd = request.values.get('mjd')
         incomplete = request.values.get('incomplete')
@@ -87,7 +92,7 @@ class Event(Resource):
         # Events
         event_names = event_name.split('+')
 
-        if attribute_name is None:
+        if quantity_name is None:
             new_dict = OrderedDict()
             for event in event_names:
                 my_cat, my_event = None, None
@@ -102,10 +107,135 @@ class Event(Resource):
                 new_dict[event] = catalogs.get(my_cat, {}).get(my_event, {})
             return new_dict
 
-        # Attributes
-        attribute_names = attribute_name.split('+')
+        # Quantities
+        quantity_names = quantity_name.split('+')
 
-        # Prioritize catalog used to initiate query.
+        have_quantity = False
+        if attribute_name is None:
+            new_dict = OrderedDict()
+            for event in event_names:
+                my_cat, my_event = None, None
+                alopts = aliases.get(event, [])
+                for opt in alopts:
+                    if opt[0] == catalog_name:
+                        my_cat, my_event = tuple(opt)
+                if not my_cat:
+                    for opt in alopts:
+                        if opt[0] != catalog_name:
+                            my_cat, my_event = tuple(opt)
+                qdict = OrderedDict()
+                for quantity in quantity_names:
+                    qdict[quantity] = catalogs.get(my_cat, {}).get(my_event, {}).get(quantity, {})
+                    if qdict[quantity] != {}:
+                        have_quantity = True
+                new_dict[event] = qdict
+            if have_quantity:
+                return new_dict
+            use_full = True
+
+        # Attributes
+        if attribute_name is not None:
+            attribute_names = attribute_name.split('+')
+
+        if not use_full:
+            new_dict = OrderedDict()
+            for event in event_names:
+                my_cat, my_event = None, None
+                alopts = aliases.get(event, [])
+                for opt in alopts:
+                    if opt[0] == catalog_name:
+                        my_cat, my_event = tuple(opt)
+                if not my_cat:
+                    for opt in alopts:
+                        if opt[0] != catalog_name:
+                            my_cat, my_event = tuple(opt)
+                qdict = OrderedDict()
+                for quantity in quantity_names:
+                    my_quantity = catalogs.get(my_cat, {}).get(my_event, {}).get(quantity, {})
+                    qdict[quantity] = self.get_attributes(attribute_names, my_quantity, fmt, incomplete)
+                new_dict[event] = qdict
+
+            if fmt in ['csv', 'tsv']:
+                # Determine which to use as axes in CSV/TSV file.
+                rax = None
+                cax = None
+                axsub = {
+                    'e': 'event',
+                    'q': 'quantity',
+                    'a': 'attribute'
+                }
+                if len(event_names) > 1:
+                    rax = 'e'
+                    if len(quantity_names) > 1:
+                        cax = 'q'
+                        if len(attribute_names) > 1:
+                            return Response('{} not supported for this query type.'.format(fmt.upper()), mimetype='text/plain')
+                    elif len(attribute_names) > 1:
+                        cax = 'a'
+                elif len(quantity_names) > 1:
+                    rax = 'q'
+                    if len(attribute_names) > 1:
+                        cax = 'a'
+                elif len(attribute_names) > 1:
+                    rax = 'a'
+
+                if rax == 'e':
+                    rowheaders = event_names
+                elif rax == 'q':
+                    rowheaders = quantity_names
+                elif rax == 'a':
+                    rowheaders = attribute_names
+
+                colheaders = None
+                if cax == 'q':
+                    colheaders = quantity_names
+                elif cax == 'a':
+                    colheaders = attribute_names
+
+                if rax and cax:
+                    rowheaders.insert(0, axsub[rax])
+
+                outarr = [[]]
+                print(rax, cax)
+                print(new_dict)
+                if rax == 'e':
+                    if cax == 'q':
+                        outarr = [[new_dict[e].get(q, '') for q in new_dict[e]] for e in new_dict]
+                        outarr = [[q[0] if len(q) == 1 else delim.join(q) for q in e] for e in outarr]
+                    else:
+                        outarr = [[i for s in new_dict[e][quantity_name] for i in s] for e in new_dict]
+                elif rax == 'q':
+                    if cax == 'a':
+                        print([len(new_dict[event_name][x]) for x in new_dict[event_name]])
+                        outarr = [[i for s in new_dict[event_name][x] for i in s] if len(new_dict[event_name][x]) == 1 else [
+                            delim.join(i) for i in list(map(list, zip(*new_dict[event_name][x])))] for x in new_dict[event_name]]
+                    else:
+                        outarr = [new_dict[event_name][x] if len(new_dict[event_name][x]) == 1 else [delim.join(new_dict[event_name][x])] for x in new_dict[event_name]]
+                elif rax == 'a':
+                    outarr = new_dict[event_name][quantity_name]
+                else:
+                    return new_dict[event_name][quantity_name]
+
+                outarr = [[('"' + x + '"') if delim in x else x for x in y] for y in outarr]
+
+                if rax is not None and cax is None:
+                    cax = rax
+                    rax = None
+                    colheaders = rowheaders
+                    rowheaders = None
+                    outarr = list(map(list, zip(*outarr)))
+
+                if colheaders:
+                    outarr.insert(0, colheaders)
+                if rowheaders:
+                    for i, row in enumerate(outarr):
+                        outarr[i].insert(0, rowheaders[i])
+
+                return Response('\n'.join([delim.join(y) for y in outarr]), mimetype='text/plain')
+
+            return new_dict
+
+        # When using the full data
         my_cat = ''
         if event_name in catalogs[catalog_name]:
             my_cat = catalog_name
@@ -119,13 +249,6 @@ class Event(Resource):
         if not my_cat:
             return {}
 
-        if quantity_name and not full and catalogs[my_cat].get(event_name, {}).get(quantity_name) is not None:
-            quantity = catalogs[my_cat][event_name][quantity_name]
-            if attribute_names is None:
-                return quantity
-            return self.get_attributes(attribute_names, quantity, fmt, incomplete)
-
-        # When using the full data
         event = json.load(open(os.path.join(
             ac_path, catdict[my_cat], 'output', 'json',
             get_filename(event_name)), 'r'), object_pairs_hook=OrderedDict)
@@ -136,7 +259,7 @@ class Event(Resource):
         else:
             name = list(event.keys())[0]
             quantity = event[name].get(quantity_name, {})
-            if attribute_names is None:
+            if attribute_name is None:
                 return quantity
             return self.get_attributes(attribute_names, quantity, fmt, incomplete)
 
@@ -150,11 +273,6 @@ class Event(Resource):
                 attributes = [[x.get(a, '') for a in anames] for x in quantity if any([x.get(a) is not None for a in anames])]
             else:
                 attributes = [[x.get(a) for a in anames] for x in quantity if all([x.get(a) is not None for a in anames])]
-
-        if fmt == 'csv':
-            return Response('\n'.join([','.join(anames)] + [','.join(x) for x in attributes]), mimetype='text/plain')
-        if fmt == 'tsv':
-            return Response('\n'.join(['\t'.join(anames)] + ['\t'.join(x) for x in attributes]), mimetype='text/plain')
 
         return attributes
 
