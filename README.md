@@ -18,13 +18,9 @@ Key names that are usable in API calls can be found in the [OAC schema](https://
 
 Whole catalog queries are used to find several objects that correspond to a given query. A few examples:
 
-#### Cone search about a set of coordinates (not functional yet)
+#### Cone search about a set of coordinates (*not implemented*)
 
 https://astrocats.space/api/catalog/sne/?ra=12:12:12&dec:+33:33:33&radius=2
-
-#### Polygon search (*not implemented*)
-
-#### Volume search (*not implemented*)
 
 ## Event queries
 
