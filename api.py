@@ -30,6 +30,15 @@ aliases = OrderedDict()
 ac_path = os.path.join('/root', 'astrocats', 'astrocats')
 
 
+def is_list(x):
+    return isinstance(x, list) and not isinstance(x, string_types)
+
+def listify(x):
+    """Return variable in a list if not already a list."""
+    if not is_list(x):
+        return [x]
+    return x
+
 def get_filename(name):
     """Return filename for astrocats event."""
     return name.replace('/', '_') + '.json'
@@ -101,7 +110,16 @@ class Event(Resource):
         fmt = fmt.lower() if fmt is not None else fmt
 
         mjd = request.values.get('mjd')
-        incomplete = request.values.get('incomplete')
+        complete = request.values.get('complete')
+        first = request.values.get('first')
+        if first is None:
+            item = request.values.get('item')
+            try:
+                item = int(item)
+            except Exception:
+                item = None
+        else:
+            item = 0
 
         if event_name is None:
             return catalogs.get(catalog_name, {})
@@ -152,6 +170,11 @@ class Event(Resource):
                         else:
                             qdict[quantity] = catalogs.get(my_cat, {}).get(
                                 my_event, {}).get(quantity, {})
+                        if item is not None:
+                            try:
+                                qdict[quantity] = qdict[quantity][item]
+                            except Exception:
+                                pass
                     else:
                         if full:
                             my_quantity = fcatalogs.get(
@@ -160,7 +183,7 @@ class Event(Resource):
                             my_quantity = catalogs.get(my_cat, {}).get(
                                 my_event, {}).get(quantity, {})
                         qdict[quantity] = self.get_attributes(
-                            attribute_names, my_quantity, incomplete)
+                            attribute_names, my_quantity, complete, item)
                     if not qdict[quantity]:
                         use_full = True
                         break
@@ -176,9 +199,9 @@ class Event(Resource):
 
         return edict
 
-    def get_attributes(self, anames, quantity, incomplete=None):
+    def get_attributes(self, anames, quantity, complete=None, item=None):
         """Return array of attributes."""
-        if incomplete is not None:
+        if complete is None:
             attributes = [
                 [x.get(a, '') for a in anames] for x in quantity if any(
                     [x.get(a) is not None for a in anames])]
@@ -186,6 +209,12 @@ class Event(Resource):
             attributes = [
                 [x.get(a, '') for a in anames] for x in quantity if all(
                     [x.get(a) is not None for a in anames])]
+
+        if item is not None:
+            try:
+                attributes = [attributes[item]]
+            except Exception:
+                pass
 
         return attributes
 
@@ -223,17 +252,19 @@ class Event(Resource):
 
         rowheaders = None
         if rax == 'e':
-            rowheaders = enames
+            rowheaders = list(enames)
         elif rax == 'q':
-            rowheaders = qnames
+            rowheaders = list(qnames)
         else:
-            rowheaders = anames
+            rowheaders = list(anames)
 
         colheaders = None
         if cax == 'q':
-            colheaders = qnames
+            colheaders = list(qnames)
         elif cax == 'a':
-            colheaders = anames
+            colheaders = list(anames)
+            if rax == 'e':
+                colheaders.insert(0, self._axsub[rax])
 
         if rax and cax:
             rowheaders.insert(0, self._axsub[rax])
@@ -244,11 +275,15 @@ class Event(Resource):
                 outarr = [
                     [edict[e].get(q, '') for q in edict[
                         e]] for e in edict]
-                outarr = [[q[0] if len(q) == 1 else delim.join(
-                    q) for q in e] for e in outarr]
+                outarr = [[[delim.join(a) if is_list(a) else a
+                    for a in q] for q in e] for e in outarr]
+                outarr = [[delim.join(q) if is_list(q) else q
+                    for q in e] for e in outarr]
             elif cax == 'a':
-                outarr = [[i for s in edict[e][qname]
-                           for i in s] for e in edict]
+                #outarr = [[i for s in edict[e][qname]
+                #           for i in s] for e in edict]
+                outarr = [i for s in [[[enames[ei]] + q for q in edict[e][qname]]
+                    for ei, e in enumerate(edict)] for i in s]
             else:
                 outarr = [edict[e][qname] for e in edict]
         elif rax == 'q':
@@ -267,20 +302,20 @@ class Event(Resource):
         elif rax == 'a':
             outarr = edict[ename][qname]
         else:
-            outarr = [edict[ename][qname]]
+            outarr = listify(edict[ename][qname])
 
         outarr = [[('"' + x + '"') if delim in x else x for x in y]
                   for y in outarr]
 
         if cax is None:
-            if rax is None:
-                outarr = list(map(list, zip(*outarr)))
+            #if rax is None:
+            #    outarr = list(map(list, zip(*outarr)))
             cax, rax = rax, None
-            colheaders, rowheaders = rowheaders, None
+            colheaders, rowheaders = list(rowheaders), None
 
         if colheaders:
             outarr.insert(0, colheaders)
-        if rowheaders:
+        if rowheaders and not (rax == 'e' and cax == 'a'):
             for i, row in enumerate(outarr):
                 outarr[i].insert(0, rowheaders[i])
 
