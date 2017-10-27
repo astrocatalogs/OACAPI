@@ -253,8 +253,6 @@ class Event(Resource):
                 outarr = [edict[e][qname] for e in edict]
         elif rax == 'q':
             if cax == 'a':
-                print([len(edict[ename][x])
-                       for x in edict[ename]])
                 outarr = [
                     [i for s in edict[ename][x] for i in s]
                     if len(edict[ename][x]) == 1 else [
@@ -274,8 +272,6 @@ class Event(Resource):
         outarr = [[('"' + x + '"') if delim in x else x for x in y]
                   for y in outarr]
 
-        print(rax, cax)
-        print(outarr)
         if cax is None:
             if rax is None:
                 outarr = list(map(list, zip(*outarr)))
@@ -287,7 +283,6 @@ class Event(Resource):
         if rowheaders:
             for i, row in enumerate(outarr):
                 outarr[i].insert(0, rowheaders[i])
-        print(outarr)
 
         return Response('\n'.join(
             [delim.join(y) for y in outarr]), mimetype='text/plain')
