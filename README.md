@@ -12,6 +12,8 @@ https://kilonova.space/api/
 
 where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided. General note on API calls: Do not use trailing slashes (`/`) in the requests, they will result in 404 errors.
 
+Key names that are usable in API calls can be found in the [OAC schema](https://github.com/astrocatalogs/schema).
+
 ## Catalog queries
 
 Whole catalog queries are used to find several objects that correspond to a given query. A few examples:
