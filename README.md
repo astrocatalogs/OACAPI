@@ -10,7 +10,7 @@ https://tde.space/api/
 
 https://kilonova.space/api/
 
-where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided.
+where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided. General note on API calls: Do not use trailing slashes (`/`) in the requests, they will result in 404 errors.
 
 ## Catalog queries
 
