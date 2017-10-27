@@ -20,6 +20,10 @@ Whole catalog queries are used to find several objects that correspond to a give
 
 https://astrocats.space/api/catalog/sne/?ra=12:12:12&dec:+33:33:33&radius=2
 
+#### Polygon search (not functional yet)
+
+#### Volume search (not functional yet)
+
 ## Event queries
 
 Individual event queries can return more-detailed information about each event, including datafiles such as spectra. Below, we show some examples of this in action:
@@ -28,7 +32,7 @@ Individual event queries can return more-detailed information about each event, 
 
 https://astrocats.space/api/SN2014J/redshift
 
-#### Select the first (preferred) value of the redshift
+#### Select the first (preferred) value of the redshift (not functional)
 
 https://astrocats.space/api/SN2014J/redshift?item=0
 
@@ -44,6 +48,10 @@ https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?format
 
 https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?format=csv&incomplete
 
+#### Return only observations matching given criteria, in this case band = B (not functional)
+
+https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?band=B
+
 #### Return the spectrum closest to the listed MJD (not functional)
 
-https://astrocats.space/api/SN2014J/spectra?mjd~55500
+https://astrocats.space/api/SN2014J/spectra?time~55500
