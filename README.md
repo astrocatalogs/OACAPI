@@ -34,8 +34,9 @@ Individual event queries can return more-detailed information about each event, 
 
 https://astrocats.space/api/SN2014J/redshift
 
-#### Select the first (preferred) value of the redshift (*not implemented*)
+#### Select the first (preferred) value of the redshift
 
+https://astrocats.space/api/SN2014J/redshift?first, or
 https://astrocats.space/api/SN2014J/redshift?item=0
 
 #### Return all photometric observations with at least one of the `magnitude`, `e_magnitude`, and `band` attributes
