@@ -20,9 +20,9 @@ Whole catalog queries are used to find several objects that correspond to a give
 
 https://astrocats.space/api/catalog/sne/?ra=12:12:12&dec:+33:33:33&radius=2
 
-#### Polygon search (not functional yet)
+#### Polygon search (*not implemented*)
 
-#### Volume search (not functional yet)
+#### Volume search (*not implemented*)
 
 ## Event queries
 
@@ -32,11 +32,11 @@ Individual event queries can return more-detailed information about each event, 
 
 https://astrocats.space/api/SN2014J/redshift
 
-#### Select the first (preferred) value of the redshift (not functional)
+#### Select the first (preferred) value of the redshift (*not implemented*)
 
 https://astrocats.space/api/SN2014J/redshift?item=0
 
-#### Return all photometric observations with a magnitude, magnitude error, and band listed
+#### Return all photometric observations with at least one of the `magnitude`, `e_magnitude`, and `band` attributes
 
 https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band
 
@@ -44,14 +44,18 @@ https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band
 
 https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?format=csv
 
-#### Include observations that contain at least one of the requested fields (rather than all)
+#### Only return observations that contain all requested attributes
 
-https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?format=csv&incomplete
+https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?complete
 
-#### Return only observations matching given criteria, in this case band = B (not functional)
+#### Return observations for multiple events at once, in CSV format
+
+https://astrocats.space/api/SN2014J+SN2015F/photometry/time+magnitude+band?format=csv
+
+#### Return only observations matching given criteria, in this case band = B (*not implemented*)
 
 https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?band=B
 
-#### Return the spectrum closest to the listed MJD (not functional)
+#### Return the spectrum closest to the listed MJD (*not implemented*)
 
 https://astrocats.space/api/SN2014J/spectra?time~55500
