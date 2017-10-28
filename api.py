@@ -1,6 +1,7 @@
 """API for the Open Astronomy Catalogs."""
 import json
 import os
+import numpy as np
 from collections import OrderedDict
 
 from werkzeug.contrib.fixers import ProxyFix
@@ -9,6 +10,9 @@ from flask import Flask, Response, request
 from flask_compress import Compress
 from flask_restful import Api, Resource
 from six import string_types
+from astropy.coordinates import SkyCoord as coord
+from astropy import units as un
+import re
 
 # Create a engine for connecting to SQLite3.
 # Assuming salaries.db is in your app root folder
@@ -26,8 +30,13 @@ catdict = OrderedDict((
 
 catalogs = OrderedDict()
 aliases = OrderedDict()
+coo = None
+rdnames = []
 
 ac_path = os.path.join('/root', 'astrocats', 'astrocats')
+
+raregex = re.compile("^[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
+decregex = re.compile("^[+-]?[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 
 
 def is_list(x):
@@ -69,23 +78,16 @@ class Catalogs(Resource):
         return catalogs
 
 
-class Catalog(Resource):
-    """Return whole catalog."""
-
-    def get(self, catalog_name, event_name):
-        """Get result."""
-
-
-class FullEvent(Resource):
+class Full(Resource):
     """Return single event."""
 
     def get(self, catalog_name, event_name, quantity_name=None, attribute_name=None):
-        """Pass-through to `Event` with `full = True`."""
-        return Event().get(catalog_name, event_name=event_name,
+        """Pass-through to `Catalog` with `full = True`."""
+        return Catalog().get(catalog_name, event_name=event_name,
             quantity_name=quantity_name, attribute_name=attribute_name, full=True)
 
 
-class Event(Resource):
+class Catalog(Resource):
     """Return single event."""
 
     _axsub = {
@@ -104,12 +106,15 @@ class Event(Resource):
         """Retrieve data, first trying catalog file then event files."""
         event = None
         use_full = full
+        ename = event_name
 
         # Options
         fmt = request.values.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
 
-        mjd = request.values.get('mjd')
+        ra = request.values.get('ra')
+        dec = request.values.get('dec')
+        radius = request.values.get('radius')
         complete = request.values.get('complete')
         first = request.values.get('first')
         if first is None:
@@ -120,18 +125,29 @@ class Event(Resource):
                 item = None
         else:
             item = 0
+        if radius is not None:
+            try:
+                radius = float(radius)
+            except Exception:
+                radius = 0.0
 
-        if event_name is None:
-            return catalogs.get(catalog_name, {})
+        if ename is None:
+            if ra is not None and dec is not None:
+                lcoo = coord(ra, dec, unit=(un.hourangle, un.deg))
+                idxcat = np.where(lcoo.separation(coo) <= radius * un.arcsecond)[0]
+                if len(idxcat):
+                    ename = '+'.join([rdnames[i] for i in idxcat])
+            if ename is None:
+                return catalogs.get(catalog_name, {})
 
-        if fmt is not None and (event_name is None or
+        if fmt is not None and (ename is None or
                 quantity_name is None or attribute_name is None):
             return Response((
                 'Error: "{}" format only supported if event name, quantity, '
                 'and attribute are specified (e.g. '
                 'SN2014J/photometry/magnitude).').format(fmt), mimetype='text/plain')
         # Events
-        event_names = [] if event_name is None else event_name.split('+')
+        event_names = [] if ename is None else ename.split('+')
 
         # Quantities
         quantity_names = [] if quantity_name is None else quantity_name.split('+')
@@ -192,7 +208,7 @@ class Event(Resource):
                 edict[event] = qdict
 
         if not full and use_full:
-            edict = self.retrieve(catalog_name, event_name, quantity_name, attribute_name, True)
+            edict = self.retrieve(catalog_name, ename, quantity_name, attribute_name, True)
 
         if not full and fmt is not None:
             return self.get_dsv(edict, event_names, quantity_names, attribute_names, fmt)
@@ -323,16 +339,19 @@ class Event(Resource):
             [delim.join(y) for y in outarr]), mimetype='text/plain')
 
 
-api.add_resource(Info, '/<string:catalog_name>/')
+#api.add_resource(Info, '/<string:catalog_name>/')
 api.add_resource(Catalogs, '/<string:catalog_name>/catalogs')
 api.add_resource(
-    FullEvent,
+    Full,
     '/<string:catalog_name>/full/<string:event_name>',
     '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>',
     '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>/<string:attribute_name>')
 api.add_resource(
-    Event,
+    Catalog,
+    '/<string:catalog_name>',
     '/<string:catalog_name>/catalog',
+    '/<string:catalog_name>/all/<string:quantity_name>',
+    '/<string:catalog_name>/all/<string:quantity_name>/<string:attribute_name>',
     '/<string:catalog_name>/event/<string:event_name>',
     '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>',
     '/<string:catalog_name>/event/<string:event_name>/<string:quantity_name>/<string:attribute_name>',
@@ -348,12 +367,38 @@ if __name__ == '__main__':
             object_pairs_hook=OrderedDict)
         catalogs[cat] = dict(zip([x['name']
                                   for x in catalogs[cat]], catalogs[cat]))
-    print('Creating alias dictionary...')
+    print('Creating alias dictionary and position arrays...')
+    ras = []
+    decs = []
     for cat in catdict:
         for event in catalogs[cat]:
-            laliases = catalogs[cat].get(event, {}).get('alias', [])
+            levent = catalogs[cat].get(event, {})
+            laliases = levent.get('alias', [])
             laliases = list(set([event] + [x['value'] for x in laliases]))
             for alias in laliases:
                 aliases.setdefault(alias, []).append([cat, event])
+            lra = levent.get('ra')
+            ldec = levent.get('dec')
+            if lra is None and ldec is None:
+                continue
+            lra = lra[0].get('value')
+            ldec = ldec[0].get('value')
+            if lra is None or ldec is None:
+                continue
+            if not raregex.match(lra) or not decregex.match(ldec):
+                continue
+            rdnames.append(event)
+            ras.append(lra)
+            decs.append(ldec)
+
+    #for i, ra in enumerate(ras):
+    #    try:
+    #        temp = coord(ra, decs[i], unit=(un.hourangle, un.deg))
+    #    except Exception as e:
+    #        print(rdnames[i], ra, decs[i])
+    #        raise e
+
+    coo = coord(ras, decs, unit=(un.hourangle, un.deg))
+
     print('Launching API...')
     app.run(threaded=True)
