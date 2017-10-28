@@ -2,6 +2,7 @@
 import json
 import os
 import numpy as np
+from timeit import default_timer as timer
 from collections import OrderedDict
 
 from werkzeug.contrib.fixers import ProxyFix
@@ -78,28 +79,30 @@ class Catalogs(Resource):
         return catalogs
 
 
-class Full(Resource):
-    """Return single event."""
-
-    def get(self, catalog_name, event_name, quantity_name=None, attribute_name=None):
-        """Pass-through to `Catalog` with `full = True`."""
-        return Catalog().get(catalog_name, event_name=event_name,
-            quantity_name=quantity_name, attribute_name=attribute_name, full=True)
-
-
 class Catalog(Resource):
     """Return single event."""
 
-    _axsub = {
+    _ANGLE_LIMIT = 36000.0
+    _EXPENSIVE = {
+        'spectra': ['data']
+    }
+    _EXPENSIVE_LIMIT = 100
+    _NO_CSV = ['data']
+    _FULL_LIMIT = 1000
+    _AXSUB = {
         'e': 'event',
         'q': 'quantity',
         'a': 'attribute'
     }
 
     def get(self, catalog_name, event_name=None, quantity_name=None,
-            attribute_name=None, full=False):
+            attribute_name=None):
         """Get result."""
-        return self.retrieve(catalog_name, event_name, quantity_name, attribute_name, full)
+        start = timer()
+        result = self.retrieve(catalog_name, event_name, quantity_name, attribute_name, False)
+        end = timer()
+        print('Time to perform query: {}s'.format(end - start))
+        return result
 
     def retrieve(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None, full=False):
@@ -109,6 +112,10 @@ class Catalog(Resource):
         ename = event_name
 
         # Options
+        if not use_full:
+            rfull = request.values.get('full')
+            if rfull is not None:
+                return self.retrieve(catalog_name, ename, quantity_name, attribute_name, True)
         fmt = request.values.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
 
@@ -130,13 +137,16 @@ class Catalog(Resource):
                 radius = float(radius)
             except Exception:
                 radius = 0.0
+            if radius >= self._ANGLE_LIMIT:
+                return {'message': 'Angle limited to {} degrees.'.format(
+                    self._ANGLE_LIMIT / 3600.)}
 
         if ename is None:
             if ra is not None and dec is not None:
                 lcoo = coord(ra, dec, unit=(un.hourangle, un.deg))
                 idxcat = np.where(lcoo.separation(coo) <= radius * un.arcsecond)[0]
                 if len(idxcat):
-                    ename = '+'.join([rdnames[i] for i in idxcat])
+                    ename = '+'.join([rdnames[i].replace('+', '$PLUS$') for i in idxcat])
             if ename is None:
                 return catalogs.get(catalog_name, {})
 
@@ -148,12 +158,25 @@ class Catalog(Resource):
                 'SN2014J/photometry/magnitude).').format(fmt), mimetype='text/plain')
         # Events
         event_names = [] if ename is None else ename.split('+')
+        event_names = [x.replace('$PLUS$', '+') for x in event_names]
 
         # Quantities
         quantity_names = [] if quantity_name is None else quantity_name.split('+')
 
         # Attributes
         attribute_names = [] if attribute_name is None else attribute_name.split('+')
+
+        if use_full and len(event_names) > self._FULL_LIMIT:
+            return {'message': 'Maximum event limit ({}) exceeded'.format(self._FULL_LIMIT)}
+
+        if fmt is not None and any([n in attribute_names for n in self._NO_CSV]):
+            return {'message': 'This query does not support delimited output'}
+
+        if len(event_names) > self._EXPENSIVE_LIMIT:
+            for quantity in quantity_names:
+                for exp in self._EXPENSIVE:
+                    if any([e in attribute_names for e in self._EXPENSIVE]):
+                        return {'message': 'Too expensive.'}
 
         edict = OrderedDict()
         fcatalogs = OrderedDict()
@@ -168,6 +191,8 @@ class Catalog(Resource):
                     if opt[0] != catalog_name:
                         my_cat, my_event = tuple(opt)
             if full:
+                if not my_cat:
+                    print(event, my_event)
                 fcatalogs.update(json.load(open(os.path.join(
                     ac_path, catdict[my_cat], 'output', 'json',
                     get_filename(my_event)), 'r'), object_pairs_hook=OrderedDict))
@@ -208,9 +233,9 @@ class Catalog(Resource):
                 edict[event] = qdict
 
         if not full and use_full:
-            edict = self.retrieve(catalog_name, ename, quantity_name, attribute_name, True)
+            return self.retrieve(catalog_name, ename, quantity_name, attribute_name, True)
 
-        if not full and fmt is not None:
+        if fmt is not None:
             return self.get_dsv(edict, event_names, quantity_names, attribute_names, fmt)
 
         return edict
@@ -280,10 +305,10 @@ class Catalog(Resource):
         elif cax == 'a':
             colheaders = list(anames)
             if rax == 'e':
-                colheaders.insert(0, self._axsub[rax])
+                colheaders.insert(0, self._AXSUB[rax])
 
         if rax and cax:
-            rowheaders.insert(0, self._axsub[rax])
+            rowheaders.insert(0, self._AXSUB[rax])
 
         outarr = [[]]
         if rax == 'e':
@@ -341,11 +366,6 @@ class Catalog(Resource):
 
 #api.add_resource(Info, '/<string:catalog_name>/')
 api.add_resource(Catalogs, '/<string:catalog_name>/catalogs')
-api.add_resource(
-    Full,
-    '/<string:catalog_name>/full/<string:event_name>',
-    '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>',
-    '/<string:catalog_name>/full/<string:event_name>/<string:quantity_name>/<string:attribute_name>')
 api.add_resource(
     Catalog,
     '/<string:catalog_name>',
