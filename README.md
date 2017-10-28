@@ -14,15 +14,19 @@ where the only difference is preference in catalog when returning items that app
 
 Key names that are usable in API calls can be found in the [OAC schema](https://github.com/astrocatalogs/schema).
 
-## Catalog queries
+## Example queries
 
 Whole catalog queries are used to find several objects that correspond to a given query. A few examples:
 
-#### Cone search about a set of coordinates (*not implemented*)
+#### Return all events within a 2" cone about a set of coordinates
 
 https://astrocats.space/api?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
-## Event queries
+By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from the catalog when search by criteria (rather than by event name) requires inserted `all` between `api/` and the rest of the query, as shown in the examples below:
+
+#### Redshifts of all supernovae within 5° of a coordinate
+
+https://astrocats.space/api/all/redshift/value?ra=10:42:16.88&dec=-24:13:12.13&radius=20000&format=csv
 
 Individual event queries can return more-detailed information about each event, including datafiles such as spectra. Below, we show some examples of this in action:
 
@@ -58,3 +62,13 @@ https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?band=B
 #### Return the spectrum closest to the listed MJD (*not implemented*)
 
 https://astrocats.space/api/SN2014J/spectra?time~55500
+
+The `all/` option (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
+
+#### Return all photometry in a 2" radius about a coordinate
+
+https://astrocats.space/api/all/photometry/time+band+magnitude?ra=21:23:32.16&dec=-53:01:36.08&radius=2&format=csv
+
+#### Return the instruments used to produce spectra within a 5° of a given coordinate
+
+https://astrocats.space/api/all/spectra/instrument?ra=21:23:32.16&dec=-53:01:36.08&radius=18000&format=csv
