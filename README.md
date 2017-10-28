@@ -20,7 +20,7 @@ Whole catalog queries are used to find several objects that correspond to a give
 
 #### Cone search about a set of coordinates (*not implemented*)
 
-https://astrocats.space/api?ra=21:23:32.16&dec:-53:01:36.08&radius=2
+https://astrocats.space/api?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
 ## Event queries
 
