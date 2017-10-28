@@ -22,11 +22,11 @@ Whole catalog queries are used to find several objects that correspond to a give
 
 https://astrocats.space/api?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
-By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from the catalog when search by criteria (rather than by event name) requires inserted `all` between `api/` and the rest of the query, as shown in the examples below:
+By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from the catalog when searching by a criterion such as position, the user should insert `all/` into the URL between `api/` and the rest of the query, as shown in the example below:
 
 #### Redshifts of all supernovae within 5° of a coordinate
 
-https://astrocats.space/api/all/redshift/value?ra=10:42:16.88&dec=-24:13:12.13&radius=20000&format=csv
+https://astrocats.space/api/all/redshift/value?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv
 
 Individual event queries can return more-detailed information about each event, including datafiles such as spectra. Below, we show some examples of this in action:
 
@@ -63,7 +63,7 @@ https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?band=B
 
 https://astrocats.space/api/SN2014J/spectra?time~55500
 
-The `all/` option (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
+The `all/` route (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
 
 #### Return all photometry in a 2" radius about a coordinate
 
