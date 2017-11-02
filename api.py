@@ -15,16 +15,13 @@ from astropy.coordinates import SkyCoord as coord
 from astropy import units as un
 import re
 
-# Create a engine for connecting to SQLite3.
-# Assuming salaries.db is in your app root folder
-
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app)
 Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-    ('sne', 'supernovae'),
+#    ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
     ('kilonova', 'kilonovae')
 ))
@@ -52,6 +49,10 @@ def listify(x):
 def get_filename(name):
     """Return filename for astrocats event."""
     return name.replace('/', '_') + '.json'
+
+def bool_str(x):
+    """Return T or F for a bool."""
+    return 'T' if x else 'F'
 
 
 class Info(Resource):
@@ -98,6 +99,7 @@ class Catalog(Resource):
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
         """Get result."""
+        print('Query:', catalog_name, event_name, quantity_name, attribute_name)
         start = timer()
         result = self.retrieve(catalog_name, event_name, quantity_name, attribute_name, False)
         end = timer()
@@ -182,14 +184,14 @@ class Catalog(Resource):
         fcatalogs = OrderedDict()
         for event in event_names:
             my_cat, my_event = None, None
-            alopts = aliases.get(event, [])
+            alopts = aliases.get(event.lower().replace(' ', ''), [])
             for opt in alopts:
                 if opt[0] == catalog_name:
-                    my_cat, my_event = tuple(opt)
+                    my_cat, my_event, my_alias = tuple(opt)
             if not my_cat:
                 for opt in alopts:
                     if opt[0] != catalog_name:
-                        my_cat, my_event = tuple(opt)
+                        my_cat, my_event, my_alias = tuple(opt)
             if full:
                 if not my_cat:
                     print(event, my_event)
@@ -345,8 +347,9 @@ class Catalog(Resource):
         else:
             outarr = listify(edict[ename][qname])
 
-        outarr = [[('"' + x + '"') if delim in x else x for x in y]
-                  for y in outarr]
+        outarr = [[bool_str(x) if isinstance(x, bool) else (
+            ('"' + x + '"') if delim in x else x) for x in y]
+            for y in outarr]
 
         if cax is None:
             #if rax is None:
@@ -379,46 +382,38 @@ api.add_resource(
     '/<string:catalog_name>/<string:event_name>/<string:quantity_name>',
     '/<string:catalog_name>/<string:event_name>/<string:quantity_name>/<string:attribute_name>')
 
-if __name__ == '__main__':
-    print('Loading catalog...')
-    for cat in catdict:
-        catalogs[cat] = json.load(open(os.path.join(
-            ac_path, catdict[cat], 'output', 'catalog.min.json'), 'r'),
-            object_pairs_hook=OrderedDict)
-        catalogs[cat] = dict(zip([x['name']
-                                  for x in catalogs[cat]], catalogs[cat]))
-    print('Creating alias dictionary and position arrays...')
-    ras = []
-    decs = []
-    for cat in catdict:
-        for event in catalogs[cat]:
-            levent = catalogs[cat].get(event, {})
-            laliases = levent.get('alias', [])
-            laliases = list(set([event] + [x['value'] for x in laliases]))
-            for alias in laliases:
-                aliases.setdefault(alias, []).append([cat, event])
-            lra = levent.get('ra')
-            ldec = levent.get('dec')
-            if lra is None and ldec is None:
-                continue
-            lra = lra[0].get('value')
-            ldec = ldec[0].get('value')
-            if lra is None or ldec is None:
-                continue
-            if not raregex.match(lra) or not decregex.match(ldec):
-                continue
-            rdnames.append(event)
-            ras.append(lra)
-            decs.append(ldec)
+print('Loading catalog...')
+for cat in catdict:
+    catalogs[cat] = json.load(open(os.path.join(
+        ac_path, catdict[cat], 'output', 'catalog.min.json'), 'r'),
+        object_pairs_hook=OrderedDict)
+    catalogs[cat] = dict(zip([x['name']
+                              for x in catalogs[cat]], catalogs[cat]))
+print('Creating alias dictionary and position arrays...')
+ras = []
+decs = []
+for cat in catdict:
+    for event in catalogs[cat]:
+        levent = catalogs[cat].get(event, {})
+        laliases = levent.get('alias', [])
+        laliases = list(set([event] + [x['value'] for x in laliases]))
+        for alias in laliases:
+            aliases.setdefault(alias.lower().replace(' ', ''), []).append([cat, event, alias])
+        lra = levent.get('ra')
+        ldec = levent.get('dec')
+        if lra is None and ldec is None:
+            continue
+        lra = lra[0].get('value')
+        ldec = ldec[0].get('value')
+        if lra is None or ldec is None:
+            continue
+        if not raregex.match(lra) or not decregex.match(ldec):
+            continue
+        rdnames.append(event)
+        ras.append(lra)
+        decs.append(ldec)
 
-    #for i, ra in enumerate(ras):
-    #    try:
-    #        temp = coord(ra, decs[i], unit=(un.hourangle, un.deg))
-    #    except Exception as e:
-    #        print(rdnames[i], ra, decs[i])
-    #        raise e
+coo = coord(ras, decs, unit=(un.hourangle, un.deg))
 
-    coo = coord(ras, decs, unit=(un.hourangle, un.deg))
-
-    print('Launching API...')
-    app.run(threaded=True)
+print('Launching API...')
+#app.run()
