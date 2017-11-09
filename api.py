@@ -266,28 +266,39 @@ class Catalog(Resource):
             else:
                 qdict = OrderedDict()
                 for quantity in quantity_names:
+                    if full:
+                        my_quantity = fcatalogs.get(
+                            my_event, {}).get(quantity, {})
+                    else:
+                        my_quantity = catalogs.get(my_cat, {}).get(
+                            my_event, {}).get(quantity, {})
+                    closest_locs = []
+                    if closest is not None:
+                        closest_locs = list(sorted(list(set([
+                            np.argmin([abs(np.mean([float(y)
+                                                    for y in listify(x.get(i))]) -
+                                           float(includes[i])) for x in my_quantity])
+                            for i in includes if len(my_quantity) and
+                            is_number(includes[i]) and
+                            all([is_number(x.get(i)) for x in my_quantity])]))))
+
                     if attribute_name is None:
                         if full:
-                            qdict[quantity] = fcatalogs.get(
-                                my_event, {}).get(quantity, {})
+                            qdict[quantity] = [x for xi, x in enumerate(my_quantity) if
+                                not len(closest_locs) or xi in closest_locs]
                         else:
-                            qdict[quantity] = catalogs.get(my_cat, {}).get(
-                                my_event, {}).get(quantity, {})
+                            qdict[quantity] = [x for xi, x in enumerate(my_quantity) if
+                                not len(closest_locs) or xi in closest_locs]
                         if item is not None:
                             try:
                                 qdict[quantity] = qdict[quantity][item]
                             except Exception:
                                 pass
                     else:
-                        if full:
-                            my_quantity = fcatalogs.get(
-                                my_event, {}).get(quantity, {})
-                        else:
-                            my_quantity = catalogs.get(my_cat, {}).get(
-                                my_event, {}).get(quantity, {})
                         qdict[quantity] = self.get_attributes(
                             attribute_names, my_quantity, complete, item,
-                            includes=includes, closest=closest)
+                            includes=includes, closest_locs=closest_locs)
+
                     if not qdict[quantity]:
                         use_full = True
                         break
@@ -307,17 +318,8 @@ class Catalog(Resource):
 
     def get_attributes(
         self, anames, quantity, complete=None, item=None, includes={},
-            closest=None):
+            closest_locs=[]):
         """Return array of attributes."""
-        closest_locs = []
-        if closest is not None:
-            closest_locs = list(sorted(list(set([
-                np.argmin([abs(np.mean([float(y)
-                                        for y in listify(x.get(i))]) -
-                               float(includes[i])) for x in quantity])
-                for i in includes if len(quantity) and
-                is_number(includes[i]) and
-                all([is_number(x.get(i)) for x in quantity])]))))
 
         if complete is None:
             attributes = [
