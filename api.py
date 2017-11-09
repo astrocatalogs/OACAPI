@@ -21,7 +21,7 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-    #    ('sne', 'supernovae'),
+    ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
     ('kilonova', 'kilonovae')
 ))
