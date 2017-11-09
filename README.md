@@ -26,7 +26,7 @@ Key names that are usable in API calls can be found in the [OAC schema](https://
 
 There are a few arguments that have special meaning and are only a part of the API, not the schema:
 
-* `closest=c`: Return the quantities with the closest value to the specified attributes. If multiple attributes are specified, the closest to each will be return (e.g., `magnitude=15&time=56789` would return *both* the observation with magnitude closest to 15 and time closest to 56789.
+* `closest`: Return the quantities with the closest value to the specified attributes. If multiple attributes are specified, the closest to each will be return (e.g., `magnitude=15&time=56789&closest` would return *both* the observation with magnitude closest to 15 and time closest to 56789.
 * `complete`: Return only quantities containing all of the requested attributes.
 * `first`: Return only the first of each of the listed quantities.
 * `format=x`: Return data in the specified format `x`, currently supports `csv` and `tsv`. Any other format specification will return `JSON`.
