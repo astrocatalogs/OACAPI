@@ -318,7 +318,6 @@ class Catalog(Resource):
                 for i in includes if len(quantity) and
                 is_number(includes[i]) and
                 all([is_number(x.get(i)) for x in quantity])]))))
-            print(closest_locs)
 
         if complete is None:
             attributes = [
