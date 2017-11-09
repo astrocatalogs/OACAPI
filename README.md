@@ -1,4 +1,4 @@
-# Open Astronomy Catalog API
+# Open Astronomy Catalog API v1.0
 
 The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the Open Astronomy Catalogs (e.g. the Open Supernova, Tidal Disruption, and Kilonova Catalogs). The API is accessible via a route that works via any of the catalog domains,
 
