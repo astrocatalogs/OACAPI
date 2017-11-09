@@ -113,6 +113,7 @@ class Catalog(Resource):
         """Get result."""
         print('Query from {}: {} -- {}/{}/{}'.format(request.remote_addr,
             catalog_name, event_name, quantity_name, attribute_name))
+        print('Arguments: ' + ', '.join(['='.join(x) for x in request.args.items()]))
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
