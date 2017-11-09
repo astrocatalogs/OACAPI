@@ -21,7 +21,7 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-#    ('sne', 'supernovae'),
+    #    ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
     ('kilonova', 'kilonovae')
 ))
@@ -57,6 +57,7 @@ def is_number(s):
         except ValueError:
             return False
 
+
 def is_list(x):
     """Check if object is a list (but not a string)."""
     return isinstance(x, list) and not isinstance(x, string_types)
@@ -72,6 +73,7 @@ def listify(x):
 def get_filename(name):
     """Return filename for astrocats event."""
     return name.replace('/', '_') + '.json'
+
 
 def bool_str(x):
     """Return T or F for a bool."""
@@ -132,9 +134,11 @@ class Catalog(Resource):
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
         """Get result."""
-        print('Query from {}: {} -- {}/{}/{}'.format(request.remote_addr,
-            catalog_name, event_name, quantity_name, attribute_name))
-        print('Arguments: ' + ', '.join(['='.join(x) for x in request.args.items()]))
+        print('Query from {}: {} -- {}/{}/{}'.format(
+            request.remote_addr, catalog_name, event_name, quantity_name,
+            attribute_name))
+        print('Arguments: ' + ', '.join(['='.join(x)
+                                         for x in request.args.items()]))
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
@@ -155,7 +159,6 @@ class Catalog(Resource):
             if rfull is not None:
                 return self.retrieve(
                     catalog_name, ename, quantity_name, attribute_name, True)
-
 
         fmt = request.values.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
@@ -238,7 +241,8 @@ class Catalog(Resource):
         fcatalogs = OrderedDict()
         for event in event_names:
             my_cat, my_event = None, None
-            alopts = aliases.get(event.lower().replace(' ', '').replace('-', ''), [])
+            alopts = aliases.get(event.lower().replace(
+                ' ', '').replace('-', ''), [])
             for opt in alopts:
                 if opt[0] == catalog_name:
                     my_cat, my_event, my_alias = tuple(opt)
@@ -282,8 +286,8 @@ class Catalog(Resource):
                             my_quantity = catalogs.get(my_cat, {}).get(
                                 my_event, {}).get(quantity, {})
                         qdict[quantity] = self.get_attributes(
-                            attribute_names, my_quantity, complete, item, includes=includes,
-                            closest=closest)
+                            attribute_names, my_quantity, complete, item,
+                            includes=includes, closest=closest)
                     if not qdict[quantity]:
                         use_full = True
                         break
@@ -301,25 +305,35 @@ class Catalog(Resource):
 
         return edict
 
-    def get_attributes(self, anames, quantity, complete=None, item=None, includes={}, closest=None):
+    def get_attributes(
+        self, anames, quantity, complete=None, item=None, includes={},
+            closest=None):
         """Return array of attributes."""
         closest_locs = []
         if closest is not None:
-            closest_locs = list(sorted(list(set([np.argmin([abs(np.mean([float(y) for y in listify(x.get(i))]) - float(includes[i])) for x in quantity]) for i in includes if len(quantity) and is_number(includes[i]) and all([is_number(x.get(i)) for x in quantity])]))))
+            closest_locs = list(sorted(list(set([
+                np.argmin([abs(np.mean([float(y)
+                                        for y in listify(x.get(i))]) -
+                               float(includes[i])) for x in quantity])
+                for i in includes if len(quantity) and
+                is_number(includes[i]) and
+                all([is_number(x.get(i)) for x in quantity])]))))
             print(closest_locs)
-            
+
         if complete is None:
             attributes = [
-                [x.get(a, '') for a in anames] for xi, x in enumerate(quantity) if any(
+                [x.get(a, '') for a in anames]
+                for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and (
-                (len(closest_locs) and xi in closest_locs) or
-                all([includes.get(i) == x.get(i) for i in includes]))]
+                    (len(closest_locs) and xi in closest_locs) or
+                    all([includes.get(i) == x.get(i) for i in includes]))]
         else:
             attributes = [
-                [x.get(a, '') for a in anames] for xi, x in enumerate(quantity) if all(
+                [x.get(a, '') for a in anames]
+                for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
-                (len(closest_locs) and xi in closest_locs) or
-                all([includes.get(i) == x.get(i) for i in includes]))]
+                    (len(closest_locs) and xi in closest_locs) or
+                    all([includes.get(i) == x.get(i) for i in includes]))]
 
         if item is not None:
             try:
@@ -415,7 +429,8 @@ class Catalog(Resource):
         else:
             outarr = listify(edict[ename][qname])
 
-        boolrows = [any([isinstance(x, bool) for x in y]) for y in list(map(list, zip(*outarr)))]
+        boolrows = [any([isinstance(x, bool) for x in y])
+                    for y in list(map(list, zip(*outarr)))]
         outarr = [[bool_str(x) if boolrows[xi] else (
             ('"' + x + '"') if delim in x else x) for xi, x in enumerate(y)]
             for y in outarr]
@@ -430,9 +445,11 @@ class Catalog(Resource):
             for i, row in enumerate(outarr):
                 outarr[i].insert(0, rowheaders[i])
 
-        return Response('\n'.join(
-            [delim.join([('"' + delim.join(z) + '"') if is_list(z) else
-                z for z in y]) for y in outarr]), mimetype='text/plain')
+        return Response('\n'.join([
+            delim.join([
+                ('"' + delim.join(z) + '"') if is_list(
+                    z) else z for z in y])
+            for y in outarr]), mimetype='text/plain')
 
 
 cn = '<string:catalog_name>'
@@ -481,7 +498,8 @@ for cat in catdict:
         laliases = levent.get('alias', [])
         laliases = list(set([event] + [x['value'] for x in laliases]))
         for alias in laliases:
-            aliases.setdefault(alias.lower().replace(' ', '').replace('-', ''), []).append([cat, event, alias])
+            aliases.setdefault(alias.lower().replace(' ', '').replace(
+                '-', ''), []).append([cat, event, alias])
         lra = levent.get('ra')
         ldec = levent.get('dec')
         if lra is None and ldec is None:
@@ -499,4 +517,4 @@ for cat in catdict:
 coo = coord(ras, decs, unit=(un.hourangle, un.deg))
 
 print('Launching API...')
-#app.run()
+# app.run()
