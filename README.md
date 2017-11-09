@@ -55,13 +55,13 @@ https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?comple
 
 https://astrocats.space/api/SN2014J+SN2015F/photometry/time+magnitude+band?format=csv
 
-#### Return only observations matching given criteria, in this case band = B (*not implemented*)
+#### Return only observations matching given criteria, in this case band = B
 
 https://astrocats.space/api/SN2014J/photometry/magnitude+e_magnitude+band?band=B
 
 #### Return the spectrum closest to the listed MJD (*not implemented*)
 
-https://astrocats.space/api/SN2014J/spectra?time~55500
+https://astrocats.space/api/SN2014J/spectra?time=55500&closest
 
 The `all/` route (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
 

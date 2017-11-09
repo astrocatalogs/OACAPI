@@ -21,7 +21,7 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-#    ('sne', 'supernovae'),
+    ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
     ('kilonova', 'kilonovae')
 ))
@@ -98,11 +98,21 @@ class Catalog(Resource):
         'q': 'quantity',
         'a': 'attribute'
     }
+    _SPECIAL_ATTR = set([
+        'format',
+        'ra',
+        'dec',
+        'radius',
+        'complete',
+        'first',
+        'item'
+    ])
 
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
         """Get result."""
-        print('Query:', catalog_name, event_name, quantity_name, attribute_name)
+        print('Query from {}: {} -- {}/{}/{}'.format(request.remote_addr,
+            catalog_name, event_name, quantity_name, attribute_name))
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
@@ -124,6 +134,7 @@ class Catalog(Resource):
                 return self.retrieve(
                     catalog_name, ename, quantity_name, attribute_name, True)
 
+
         fmt = request.values.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
 
@@ -132,6 +143,12 @@ class Catalog(Resource):
         radius = request.values.get('radius')
         complete = request.values.get('complete')
         first = request.values.get('first')
+
+        include_keys = list(set(request.args.keys()) - self._SPECIAL_ATTR)
+        includes = OrderedDict()
+        for key in include_keys:
+            includes[key] = request.values.get(key)
+
         if first is None:
             item = request.values.get('item')
             try:
@@ -208,7 +225,7 @@ class Catalog(Resource):
                         my_cat, my_event, my_alias = tuple(opt)
             if full:
                 if not my_cat:
-                    print(event, my_event)
+                    return {'message': 'Event not found in any catalog.'}
                 fcatalogs.update(json.load(
                     open(os.path.join(
                         ac_path, catdict[my_cat], 'output', 'json',
@@ -242,7 +259,7 @@ class Catalog(Resource):
                             my_quantity = catalogs.get(my_cat, {}).get(
                                 my_event, {}).get(quantity, {})
                         qdict[quantity] = self.get_attributes(
-                            attribute_names, my_quantity, complete, item)
+                            attribute_names, my_quantity, complete, item, includes=includes)
                     if not qdict[quantity]:
                         use_full = True
                         break
@@ -260,16 +277,18 @@ class Catalog(Resource):
 
         return edict
 
-    def get_attributes(self, anames, quantity, complete=None, item=None):
+    def get_attributes(self, anames, quantity, complete=None, item=None, includes={}):
         """Return array of attributes."""
         if complete is None:
             attributes = [
                 [x.get(a, '') for a in anames] for x in quantity if any(
-                    [x.get(a) is not None for a in anames])]
+                    [x.get(a) is not None for a in anames]) and
+                all([includes.get(i) == x.get(i) for i in includes])]
         else:
             attributes = [
                 [x.get(a, '') for a in anames] for x in quantity if all(
-                    [x.get(a) is not None for a in anames])]
+                    [x.get(a) is not None for a in anames]) and
+                all([includes.get(i) == x.get(i) for i in includes])]
 
         if item is not None:
             try:
@@ -381,7 +400,8 @@ class Catalog(Resource):
                 outarr[i].insert(0, rowheaders[i])
 
         return Response('\n'.join(
-            [delim.join(y) for y in outarr]), mimetype='text/plain')
+            [delim.join([('"' + delim.join(z) + '"') if is_list(z) else
+                z for z in y]) for y in outarr]), mimetype='text/plain')
 
 
 cn = '<string:catalog_name>'
