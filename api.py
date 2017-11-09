@@ -21,7 +21,7 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-    ('sne', 'supernovae'),
+#    ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
     ('kilonova', 'kilonovae')
 ))
@@ -36,6 +36,26 @@ ac_path = os.path.join('/root', 'astrocats', 'astrocats')
 raregex = re.compile("^[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 decregex = re.compile("^[+-]?[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 
+
+def is_number(s):
+    """Check if input is a number."""
+    if isinstance(s, list) and not isinstance(s, string_types):
+        try:
+            for x in s:
+                if isinstance(x, string_types) and ' ' in x:
+                    raise ValueError
+            [float(x) for x in s]
+            return True
+        except ValueError:
+            return False
+    else:
+        try:
+            if isinstance(s, string_types) and ' ' in s:
+                raise ValueError
+            float(s)
+            return True
+        except ValueError:
+            return False
 
 def is_list(x):
     """Check if object is a list (but not a string)."""
@@ -105,6 +125,7 @@ class Catalog(Resource):
         'radius',
         'complete',
         'first',
+        'closest',
         'item'
     ])
 
@@ -144,6 +165,7 @@ class Catalog(Resource):
         radius = request.values.get('radius')
         complete = request.values.get('complete')
         first = request.values.get('first')
+        closest = request.values.get('closest')
 
         include_keys = list(set(request.args.keys()) - self._SPECIAL_ATTR)
         includes = OrderedDict()
@@ -216,7 +238,7 @@ class Catalog(Resource):
         fcatalogs = OrderedDict()
         for event in event_names:
             my_cat, my_event = None, None
-            alopts = aliases.get(event.lower().replace(' ', ''), [])
+            alopts = aliases.get(event.lower().replace(' ', '').replace('-', ''), [])
             for opt in alopts:
                 if opt[0] == catalog_name:
                     my_cat, my_event, my_alias = tuple(opt)
@@ -260,7 +282,8 @@ class Catalog(Resource):
                             my_quantity = catalogs.get(my_cat, {}).get(
                                 my_event, {}).get(quantity, {})
                         qdict[quantity] = self.get_attributes(
-                            attribute_names, my_quantity, complete, item, includes=includes)
+                            attribute_names, my_quantity, complete, item, includes=includes,
+                            closest=closest)
                     if not qdict[quantity]:
                         use_full = True
                         break
@@ -278,18 +301,25 @@ class Catalog(Resource):
 
         return edict
 
-    def get_attributes(self, anames, quantity, complete=None, item=None, includes={}):
+    def get_attributes(self, anames, quantity, complete=None, item=None, includes={}, closest=None):
         """Return array of attributes."""
+        closest_locs = []
+        if closest is not None:
+            closest_locs = list(sorted(list(set([np.argmin([abs(np.mean([float(y) for y in listify(x.get(i))]) - float(includes[i])) for x in quantity]) for i in includes if len(quantity) and is_number(includes[i]) and all([is_number(x.get(i)) for x in quantity])]))))
+            print(closest_locs)
+            
         if complete is None:
             attributes = [
-                [x.get(a, '') for a in anames] for x in quantity if any(
-                    [x.get(a) is not None for a in anames]) and
-                all([includes.get(i) == x.get(i) for i in includes])]
+                [x.get(a, '') for a in anames] for xi, x in enumerate(quantity) if any(
+                    [x.get(a) is not None for a in anames]) and (
+                (len(closest_locs) and xi in closest_locs) or
+                all([includes.get(i) == x.get(i) for i in includes]))]
         else:
             attributes = [
-                [x.get(a, '') for a in anames] for x in quantity if all(
-                    [x.get(a) is not None for a in anames]) and
-                all([includes.get(i) == x.get(i) for i in includes])]
+                [x.get(a, '') for a in anames] for xi, x in enumerate(quantity) if all(
+                    [x.get(a) is not None for a in anames]) and (
+                (len(closest_locs) and xi in closest_locs) or
+                all([includes.get(i) == x.get(i) for i in includes]))]
 
         if item is not None:
             try:
@@ -451,7 +481,7 @@ for cat in catdict:
         laliases = levent.get('alias', [])
         laliases = list(set([event] + [x['value'] for x in laliases]))
         for alias in laliases:
-            aliases.setdefault(alias.lower().replace(' ', ''), []).append([cat, event, alias])
+            aliases.setdefault(alias.lower().replace(' ', '').replace('-', ''), []).append([cat, event, alias])
         lra = levent.get('ra')
         ldec = levent.get('dec')
         if lra is None and ldec is None:
