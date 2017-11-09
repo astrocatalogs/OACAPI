@@ -10,7 +10,7 @@ https://api.tde.space/
 
 https://api.kilonova.space/
 
-where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the api.astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided. General note on API calls: Do not use trailing slashes (`/`) in the requests, they will result in 404 errors.
+where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the api.astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided.
 
 ## General use
 
@@ -26,7 +26,7 @@ Key names that are usable in API calls can be found in the [OAC schema](https://
 
 #### Return all events within a 2" cone about a set of coordinates
 
-https://astrocats.space/api?ra=21:23:32.16&dec=-53:01:36.08&radius=2
+https://api.astrocats.space?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
 By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from the catalog when searching by a criterion such as position, the user should insert `all/` into the URL before the rest of the query, as shown in the example below:
 
