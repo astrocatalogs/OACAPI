@@ -415,15 +415,25 @@ api.add_resource(Catalogs, '/'.join(['', cn, 'catalogs']))
 api.add_resource(
     Catalog,
     '/'.join(['', cn]),
+    '/'.join(['', cn]) + '/',
     '/'.join(['', cn, 'catalog']),
+    '/'.join(['', cn, 'catalog']) + '/',
     '/'.join(['', cn, 'all', qn]),
+    '/'.join(['', cn, 'all', qn]) + '/',
     '/'.join(['', cn, 'all', qn, an]),
+    '/'.join(['', cn, 'all', qn, an]) + '/',
     '/'.join(['', cn, 'event', en]),
+    '/'.join(['', cn, 'event', en]) + '/',
     '/'.join(['', cn, 'event', en, qn]),
+    '/'.join(['', cn, 'event', en, qn]) + '/',
     '/'.join(['', cn, 'event', en, qn, an]),
+    '/'.join(['', cn, 'event', en, qn, an]) + '/',
     '/'.join(['', cn, en]),
+    '/'.join(['', cn, en]) + '/',
     '/'.join(['', cn, en, qn]),
-    '/'.join(['', cn, en, qn, an]))
+    '/'.join(['', cn, en, qn]) + '/',
+    '/'.join(['', cn, en, qn, an]),
+    '/'.join(['', cn, en, qn, an]) + '/')
 
 print('Loading catalog...')
 for cat in catdict:
