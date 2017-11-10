@@ -1,4 +1,4 @@
-# Open Astronomy Catalog API
+# Open Astronomy Catalog API v1.0
 
 The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the Open Astronomy Catalogs (e.g. the Open Supernova, Tidal Disruption, and Kilonova Catalogs). The API is accessible via a route that works via any of the catalog domains,
 
@@ -21,6 +21,17 @@ The pattern for the API is one of the domains listed above (e.g. `https://api.as
 where `EVENT` is set to a transient's name, `QUANTITY` is set to a desired quantity to retrieve (e.g. redshift), `ATTRIBUTE` is a property of that quantity, and the `ARGUMENT` variables allow to user to filter data based upon various attribute values. The `ARGUMENT` variables can either filter via a simple equality such as `telescope=HST`, which would only return `QUANTITY` objects where the `telescope` attribute equals `"HST"`, or they can be more powerful for certain filter attributes (examples being `ra` and `dec` for doing cone searches).
 
 Key names that are usable in API calls can be found in the [OAC schema](https://github.com/astrocatalogs/schema). Below, we provide some example queries that demonstrate the API's capabilites.
+
+### Special arguments
+
+There are a few arguments that have special meaning and are only a part of the API, not the schema:
+
+* `closest`: Return the quantities with the closest value to the specified attributes. If multiple attributes are specified, the closest to each will be return (e.g., `magnitude=15&time=56789&closest` would return *both* the observation with magnitude closest to 15 and time closest to 56789.
+* `complete`: Return only quantities containing all of the requested attributes.
+* `first`: Return only the first of each of the listed quantities.
+* `format=x`: Return data in the specified format `x`, currently supports `csv` and `tsv`. Any other format specification will return `JSON`.
+* `item=n`: Return only the first `n` of each of the listed quantities.
+* `radius=r`: Return events within a distance `r` (in arcseconds) of a given set of `ra` and `dec` coordinates. Note that this disables exact matches for `ra` and `dec`.
 
 ## Example queries
 
@@ -65,9 +76,9 @@ https://api.astrocats.space/SN2014J+SN2015F/photometry/time+magnitude+band?forma
 
 https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?band=B
 
-#### Return the spectrum closest to the listed MJD (*not implemented*)
+#### Return the spectrum closest to the listed MJD
 
-https://api.astrocats.space/SN2014J/spectra?time=55500&closest
+https://api.astrocats.space/SN2014J/spectra/time?time=56703.2&closest
 
 The `all/` route (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
 
