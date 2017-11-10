@@ -6,6 +6,7 @@ from collections import OrderedDict
 from timeit import default_timer as timer
 
 import numpy as np
+import logging
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
 from six import string_types
@@ -36,6 +37,8 @@ ac_path = os.path.join('/root', 'astrocats', 'astrocats')
 raregex = re.compile("^[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 decregex = re.compile("^[+-]?[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 
+logger = logging.getLogger('gunicorn.error')
+logger.setLevel(logging.INFO)
 
 def is_number(s):
     """Check if input is a number."""
@@ -134,16 +137,16 @@ class Catalog(Resource):
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
         """Get result."""
-        print('Query from {}: {} -- {}/{}/{}'.format(
+        logger.info('Query from {}: {} -- {}/{}/{}'.format(
             request.remote_addr, catalog_name, event_name, quantity_name,
             attribute_name))
-        print('Arguments: ' + ', '.join(['='.join(x)
+        logger.info('Arguments: ' + ', '.join(['='.join(x)
                                          for x in request.args.items()]))
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
         end = timer()
-        print('Time to perform query: {}s'.format(end - start))
+        logger.info('Time to perform query: {}s'.format(end - start))
         return result
 
     def retrieve(self, catalog_name, event_name=None, quantity_name=None,
@@ -483,14 +486,14 @@ api.add_resource(
     '/'.join(['', cn, en, qn, an]),
     '/'.join(['', cn, en, qn, an]) + '/')
 
-print('Loading catalog...')
+logger.info('Loading catalog...')
 for cat in catdict:
     catalogs[cat] = json.load(open(os.path.join(
         ac_path, catdict[cat], 'output', 'catalog.min.json'), 'r'),
         object_pairs_hook=OrderedDict)
     catalogs[cat] = dict(zip([x['name']
                               for x in catalogs[cat]], catalogs[cat]))
-print('Creating alias dictionary and position arrays...')
+logger.info('Creating alias dictionary and position arrays...')
 ras = []
 decs = []
 for cat in catdict:
@@ -517,5 +520,5 @@ for cat in catdict:
 
 coo = coord(ras, decs, unit=(un.hourangle, un.deg))
 
-print('Launching API...')
+logger.info('Launching API...')
 # app.run()
