@@ -324,20 +324,21 @@ class Catalog(Resource):
             closest_locs=[]):
         """Return array of attributes."""
 
+        logger.info(includes)
         if complete is None:
             attributes = [
                 [x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([includes.get(i) == x.get(i) for i in includes]))]
+                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes]))]
         else:
             attributes = [
                 [x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([includes.get(i) == x.get(i) for i in includes]))]
+                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes]))]
 
         if item is not None:
             try:
