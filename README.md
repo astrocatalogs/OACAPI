@@ -30,7 +30,7 @@ There are a few arguments that have special meaning and are only a part of the A
 * `complete`: Return only quantities containing all of the requested attributes.
 * `first`: Return only the first of each of the listed quantities.
 * `format=x`: Return data in the specified format `x`, currently supports `csv` and `tsv`. Any other format specification will return `JSON`.
-* `item=n`: Return only the first `n` of each of the listed quantities.
+* `item=n`: Return only the `n`th item of each of the listed quantities.
 * `radius=r`: Return events within a distance `r` (in arcseconds) of a given set of `ra` and `dec` coordinates. Note that this disables exact matches for `ra` and `dec`.
 
 ## Example queries
