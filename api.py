@@ -333,7 +333,7 @@ class Catalog(Resource):
 
         if complete is None:
             attributes = [
-                [','.join(sources[[int(y) for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
+                [','.join(sources[[int(y) - 1 for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
@@ -341,7 +341,7 @@ class Catalog(Resource):
                     not any([e in x if (excludes.get(e) == '') else (excludes.get(e) == x.get(e)) for e in excludes])]
         else:
             attributes = [
-                [','.join(sources[[int(y) for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
+                [','.join(sources[[int(y) - 1 for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
