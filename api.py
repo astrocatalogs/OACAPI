@@ -1,12 +1,12 @@
 """API for the Open Astronomy Catalogs."""
 import json
+import logging
 import os
 import re
 from collections import OrderedDict
 from timeit import default_timer as timer
 
 import numpy as np
-import logging
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
 from six import string_types
@@ -39,6 +39,7 @@ decregex = re.compile("^[+-]?[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 
 logger = logging.getLogger('gunicorn.error')
 logger.setLevel(logging.INFO)
+
 
 def is_number(s):
     """Check if input is a number."""
@@ -141,7 +142,7 @@ class Catalog(Resource):
             request.remote_addr, catalog_name, event_name, quantity_name,
             attribute_name))
         logger.info('Arguments: ' + ', '.join(['='.join(x)
-                                         for x in request.args.items()]))
+                                               for x in request.args.items()]))
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
@@ -264,7 +265,8 @@ class Catalog(Resource):
                         ac_path, catdict[my_cat], 'output', 'json',
                         get_filename(my_event)), 'r'),
                     object_pairs_hook=OrderedDict))
-                sources[my_event] = [x.get('bibcode', x.get('arxivid', x.get('name')))
+                sources[my_event] = [
+                    x.get('bibcode', x.get('arxivid', x.get('name')))
                     for x in fcatalogs[my_event].get('sources')]
             if quantity_name is None:
                 if full:
@@ -283,20 +285,23 @@ class Catalog(Resource):
                     closest_locs = []
                     if closest is not None:
                         closest_locs = list(sorted(list(set([
-                            np.argmin([abs(np.mean([float(y)
-                                                    for y in listify(x.get(i))]) -
-                                           float(includes[i])) for x in my_quantity])
+                            np.argmin([abs(np.mean([
+                                float(y) for y in listify(x.get(i))]) - float(
+                                    includes[i])) for x in my_quantity])
                             for i in includes if len(my_quantity) and
                             is_number(includes[i]) and
-                            all([is_number(x.get(i)) for x in my_quantity])]))))
+                            all([is_number(x.get(i))
+                                 for x in my_quantity])]))))
 
                     if attribute_name is None:
                         if full:
-                            qdict[quantity] = [x for xi, x in enumerate(my_quantity) if
-                                not len(closest_locs) or xi in closest_locs]
+                            qdict[quantity] = [x for xi, x in enumerate(
+                                my_quantity) if not len(
+                                    closest_locs) or xi in closest_locs]
                         else:
-                            qdict[quantity] = [x for xi, x in enumerate(my_quantity) if
-                                not len(closest_locs) or xi in closest_locs]
+                            qdict[quantity] = [x for xi, x in enumerate(
+                                my_quantity) if not len(
+                                    closest_locs) or xi in closest_locs]
                         if item is not None:
                             try:
                                 qdict[quantity] = qdict[quantity][item]
@@ -330,23 +335,30 @@ class Catalog(Resource):
         self, anames, quantity, complete=None, item=None, includes={},
             excludes={}, closest_locs=[], sources=[]):
         """Return array of attributes."""
-
         if complete is None:
             attributes = [
-                [','.join(sources[[int(y) - 1 for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
+                [','.join(sources[[int(y) - 1 for y in x.get(
+                    a, '').split(',')]])
+                 if a == 'source' else x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes])) and
-                    not any([e in x if (excludes.get(e) == '') else (excludes.get(e) == x.get(e)) for e in excludes])]
+                    all([i in x if (includes.get(i) == '') else (
+                        includes.get(i) == x.get(i)) for i in includes])) and
+                not any([e in x if (excludes.get(e) == '') else (
+                    excludes.get(e) == x.get(e)) for e in excludes])]
         else:
             attributes = [
-                [','.join(sources[[int(y) - 1 for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
+                [','.join(sources[[int(y) - 1 for y in x.get(
+                    a, '').split(',')]])
+                 if a == 'source' else x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes])) and
-                    not any([e in x if (excludes.get(e) == '') else (excludes.get(e) == x.get(e)) for e in excludes])]
+                    all([i in x if (includes.get(i) == '') else (
+                        includes.get(i) == x.get(i)) for i in includes])) and
+                not any([e in x if (excludes.get(e) == '') else (
+                    excludes.get(e) == x.get(e)) for e in excludes])]
 
         if item is not None:
             try:
