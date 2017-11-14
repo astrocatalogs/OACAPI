@@ -178,6 +178,8 @@ class Catalog(Resource):
         for key in include_keys:
             includes[key] = request.values.get(key)
 
+        excludes = OrderedDict([('realization', '')])
+
         if first is None:
             item = request.values.get('item')
             try:
@@ -222,7 +224,7 @@ class Catalog(Resource):
         quantity_names = [
         ] if quantity_name is None else quantity_name.split('+')
 
-        # Attributes
+        # Attributes. Always append source.
         attribute_names = [
         ] if attribute_name is None else attribute_name.split('+')
 
@@ -242,6 +244,7 @@ class Catalog(Resource):
 
         edict = OrderedDict()
         fcatalogs = OrderedDict()
+        sources = OrderedDict()
         for event in event_names:
             my_cat, my_event = None, None
             alopts = aliases.get(event.lower().replace(
@@ -261,6 +264,8 @@ class Catalog(Resource):
                         ac_path, catdict[my_cat], 'output', 'json',
                         get_filename(my_event)), 'r'),
                     object_pairs_hook=OrderedDict))
+                sources[my_event] = [x.get('bibcode', x.get('arxivid', x.get('name')))
+                    for x in fcatalogs[my_event].get('sources')]
             if quantity_name is None:
                 if full:
                     edict[event] = fcatalogs.get(my_event, {})
@@ -300,7 +305,9 @@ class Catalog(Resource):
                     else:
                         qdict[quantity] = self.get_attributes(
                             attribute_names, my_quantity, complete, item,
-                            includes=includes, closest_locs=closest_locs)
+                            includes=includes, excludes=excludes,
+                            closest_locs=closest_locs,
+                            sources=np.array(sources.get(my_event, [])))
 
                     if not qdict[quantity]:
                         use_full = True
@@ -321,24 +328,25 @@ class Catalog(Resource):
 
     def get_attributes(
         self, anames, quantity, complete=None, item=None, includes={},
-            closest_locs=[]):
+            excludes={}, closest_locs=[], sources=[]):
         """Return array of attributes."""
 
-        logger.info(includes)
         if complete is None:
             attributes = [
-                [x.get(a, '') for a in anames]
+                [','.join(sources[[int(y) for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes]))]
+                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes])) and
+                    not any([e in x if (excludes.get(e) == '') else (excludes.get(e) == x.get(e)) for e in excludes])]
         else:
             attributes = [
-                [x.get(a, '') for a in anames]
+                [','.join(sources[[int(y) for y in x.get(a, '').split(',')]]) if a == 'source' else x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes]))]
+                    all([i in x if (includes.get(i) == '') else (includes.get(i) == x.get(i)) for i in includes])) and
+                    not any([e in x if (excludes.get(e) == '') else (excludes.get(e) == x.get(e)) for e in excludes])]
 
         if item is not None:
             try:
