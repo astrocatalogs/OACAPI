@@ -72,6 +72,10 @@ https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?comple
 
 https://api.astrocats.space/SN2014J+SN2015F/photometry/time+magnitude+band?format=csv
 
+#### Return only observations whose attributes include the listed keys (`e_magnitude` and `band`)
+
+https://api.astrocats.space/SN2014J/photometry/time+magnitude+e_magnitude+band?e_magnitude&band
+
 #### Return only observations matching given criteria, in this case band = B
 
 https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?band=B
