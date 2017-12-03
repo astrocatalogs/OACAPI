@@ -488,6 +488,8 @@ class Catalog(Resource):
                     return Response(
                         '{} not supported for this query type.'.format(
                             fmt.upper()), mimetype='text/plain')
+            elif len(anames) > 0:
+                cax = 'a'
         elif len(qnames) > 1:
             rax = 'q'
             if len(anames) > 0:
