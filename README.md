@@ -98,7 +98,7 @@ https://api.astrocats.space/all/lumdist+claimedtype?lumdist&claimedtype=ia&forma
 
 #### Return the spectrum closest to the listed MJD
 
-https://api.astrocats.space/SN2014J/spectra/time?time=56703.2&closest
+https://api.astrocats.space/SN2014J/spectra/time+data?time=56703.2&closest
 
 The `all/` route (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
 
