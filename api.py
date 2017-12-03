@@ -22,7 +22,7 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-    ('sne', 'supernovae'),
+#    ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
     ('kilonova', 'kilonovae')
 ))
@@ -129,11 +129,16 @@ class Catalog(Resource):
         'ra',
         'dec',
         'radius',
+        'width',
+        'height',
         'complete',
         'first',
         'closest',
         'item'
     ])
+
+    def post(self, *args, **kwargs):
+        return self.get(*args, **kwargs), 200
 
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
@@ -155,26 +160,52 @@ class Catalog(Resource):
         """Retrieve data, first trying catalog file then event files."""
         event = None
         use_full = full
+        search_all = False
         ename = event_name
+        qname = quantity_name
+        aname = attribute_name
+
+        # Load event/quantity/attribute if provided by request.
+        event_req = request.values.get('event')
+        quantity_req = request.values.get('quantity')
+        attribute_req = request.values.get('attribute')
+        if ename is None and event_req is not None:
+            if not isinstance(event_req, string_types):
+                ename = '+'.join(listify(event_req))
+            else:
+                ename = event_req
+        if qname is None and quantity_req is not None:
+            if not isinstance(quantity_req, string_types):
+                qname = '+'.join(listify(quantity_req))
+            else:
+                qname = event_req
+        if aname is None and attribute_req is not None:
+            if not isinstance(attribute_req, string_types):
+                aname = '+'.join(listify(attribute_req))
+            else:
+                aname = event_req
 
         # Options
         if not use_full:
             rfull = request.values.get('full')
             if rfull is not None:
                 return self.retrieve(
-                    catalog_name, ename, quantity_name, attribute_name, True)
+                    catalog_name, ename, qname, aname, True)
 
         fmt = request.values.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
 
+
         ra = request.values.get('ra')
         dec = request.values.get('dec')
         radius = request.values.get('radius')
+        width = request.values.get('width')
+        height = request.values.get('height')
         complete = request.values.get('complete')
         first = request.values.get('first')
         closest = request.values.get('closest')
 
-        include_keys = list(set(request.args.keys()) - self._SPECIAL_ATTR)
+        include_keys = list(sorted(set(request.args.keys()) - self._SPECIAL_ATTR))
         includes = OrderedDict()
         for key in include_keys:
             includes[key] = request.values.get(key)
@@ -195,39 +226,85 @@ class Catalog(Resource):
             except Exception:
                 radius = 0.0
             if radius >= self._ANGLE_LIMIT:
-                return {'message': 'Angle limited to {} degrees.'.format(
+                return {'message': 'Radius limited to {} degrees.'.format(
+                    self._ANGLE_LIMIT / 3600.)}
+        if width is not None:
+            try:
+                width = float(width)
+            except Exception:
+                width = 0.0
+            if width >= self._ANGLE_LIMIT:
+                return {'message': 'Width limited to {} degrees.'.format(
+                    self._ANGLE_LIMIT / 3600.)}
+        if height is not None:
+            try:
+                height = float(height)
+            except Exception:
+                height = 0.0
+            if height >= self._ANGLE_LIMIT:
+                return {'message': 'Height limited to {} degrees.'.format(
                     self._ANGLE_LIMIT / 3600.)}
 
         if ename is None:
             if ra is not None and dec is not None:
                 lcoo = coord(ra, dec, unit=(un.hourangle, un.deg))
-                idxcat = np.where(lcoo.separation(coo) <=
-                                  radius * un.arcsecond)[0]
+                if width is not None and height is not None and width > 0.0 and height > 0.0:
+                    idxcat = np.where((abs(lcoo.ra - coo.ra) <= width * un.arcsecond) & (
+                        abs(lcoo.dec - coo.dec) <= height * un.arcsecond))[0]
+                elif width is not None and width > 0.0:
+                    idxcat = np.where(abs(lcoo.ra - coo.ra) <= width * un.arcsecond)[0]
+                elif height is not None and height > 0.0:
+                    idxcat = np.where(abs(lcoo.dec - coo.dec) <= height * un.arcsecond)[0]
+                else:
+                    if radius is None or radius == 0.0:
+                        radius = 1.0
+                    idxcat = np.where(lcoo.separation(coo) <=
+                                      radius * un.arcsecond)[0]
                 if len(idxcat):
                     ename = '+'.join([rdnames[i].replace('+', '$PLUS$')
                                       for i in idxcat])
-            if ename is None:
+                else:
+                    return {'message': 'No objects found within specified search region.'}
+            elif qname is None and aname is None:
                 return catalogs.get(catalog_name, {})
 
-        if fmt is not None and (
-                ename is None or quantity_name is None or
-                attribute_name is None):
+        if fmt is not None and (qname is None or aname is None):
             return Response((
-                'Error: "{}" format only supported if event name, quantity, '
+                'Error: "{}" format only supported if quantity '
                 'and attribute are specified (e.g. '
                 'SN2014J/photometry/magnitude).').format(
                     fmt), mimetype='text/plain')
         # Events
         event_names = [] if ename is None else ename.split('+')
+        # Check for + in names
+        nevent_names = []
+        joined = False
+        for ni, name in enumerate(event_names):
+            if joined:
+                joined = False
+                continue
+            if ni < len(event_names) - 1:
+                jname = '+'.join(event_names[ni:ni+2])
+                if jname.lower().replace(' ', '') in aliases:
+                    nevent_names.append(jname)
+                    joined = True
+                    continue
+            nevent_names.append(name)
+        event_names = nevent_names
+
         event_names = [x.replace('$PLUS$', '+') for x in event_names]
+
+        if not len(event_names):
+            search_all = True
+            event_names = all_events
 
         # Quantities
         quantity_names = [
-        ] if quantity_name is None else quantity_name.split('+')
+        ] if qname is None else qname.split('+')
 
         # Attributes. Always append source.
         attribute_names = [
-        ] if attribute_name is None else attribute_name.split('+')
+        ] if aname is None else aname.split('+')
 
         if use_full and len(event_names) > self._FULL_LIMIT:
             return {'message': 'Maximum event limit ({}) exceeded'.format(
@@ -241,15 +318,14 @@ class Catalog(Resource):
             for quantity in quantity_names:
                 for exp in self._EXPENSIVE:
                     if any([e in attribute_names for e in self._EXPENSIVE]):
-                        return {'message': 'Too expensive.'}
+                        return {'message': 'Query too expensive, we suggest cloning the OAC catalogs locally (see e.g. "https://sne.space/download/").'}
 
         edict = OrderedDict()
         fcatalogs = OrderedDict()
         sources = OrderedDict()
         for event in event_names:
             my_cat, my_event = None, None
-            alopts = aliases.get(event.lower().replace(
-                ' ', '').replace('-', ''), [])
+            alopts = aliases.get(event.lower().replace(' ', ''), [])
             for opt in alopts:
                 if opt[0] == catalog_name:
                     my_cat, my_event, my_alias = tuple(opt)
@@ -257,9 +333,9 @@ class Catalog(Resource):
                 for opt in alopts:
                     if opt[0] != catalog_name:
                         my_cat, my_event, my_alias = tuple(opt)
+            if not my_cat:
+                return {'message': 'Event "{}" not found in any catalog.'.format(event)}
             if full:
-                if not my_cat:
-                    return {'message': 'Event not found in any catalog.'}
                 fcatalogs.update(json.load(
                     open(os.path.join(
                         ac_path, catdict[my_cat], 'output', 'json',
@@ -268,20 +344,22 @@ class Catalog(Resource):
                 sources[my_event] = [
                     x.get('bibcode', x.get('arxivid', x.get('name')))
                     for x in fcatalogs[my_event].get('sources')]
-            if quantity_name is None:
+            if qname is None:
                 if full:
                     edict[event] = fcatalogs.get(my_event, {})
                 else:
                     edict[event] = catalogs.get(my_cat, {}).get(my_event, {})
             else:
+                # Check if user passed quantity or attribute names to filter by.
                 qdict = OrderedDict()
                 for quantity in quantity_names:
                     if full:
-                        my_quantity = fcatalogs.get(
-                            my_event, {}).get(quantity, {})
+                        my_event_dict = fcatalogs.get(
+                            my_event, {})
                     else:
-                        my_quantity = catalogs.get(my_cat, {}).get(
-                            my_event, {}).get(quantity, {})
+                        my_event_dict = catalogs.get(my_cat, {}).get(
+                            my_event, {})
+                    my_quantity = my_event_dict.get(quantity, {})
                     closest_locs = []
                     if closest is not None:
                         closest_locs = list(sorted(list(set([
@@ -293,15 +371,17 @@ class Catalog(Resource):
                             all([is_number(x.get(i))
                                  for x in my_quantity])]))))
 
-                    if attribute_name is None:
-                        if full:
+                    if aname is None:
+                        logger.info(includes)
+                        logger.info(my_event_dict)
+                        if not len(includes) or all([
+                            (i in my_event_dict) if (includes.get(i) == '') else (
+                                includes.get(i) in [v.get('value', '') for v in my_event_dict.get(i, [])
+                                    ]) for i in includes])
                             qdict[quantity] = [x for xi, x in enumerate(
                                 my_quantity) if not len(
                                     closest_locs) or xi in closest_locs]
-                        else:
-                            qdict[quantity] = [x for xi, x in enumerate(
-                                my_quantity) if not len(
-                                    closest_locs) or xi in closest_locs]
+                            
                         if item is not None:
                             try:
                                 qdict[quantity] = qdict[quantity][item]
@@ -314,16 +394,17 @@ class Catalog(Resource):
                             closest_locs=closest_locs,
                             sources=np.array(sources.get(my_event, [])))
 
-                    if not qdict[quantity]:
+                    if not search_all and not qdict[quantity]:
                         use_full = True
                         break
                 if not full and use_full:
                     break
-                edict[event] = qdict
+                if qdict:
+                    edict[event] = qdict
 
         if not full and use_full:
             return self.retrieve(
-                catalog_name, ename, quantity_name, attribute_name, True)
+                catalog_name, ename, qname, aname, True)
 
         if fmt is not None:
             return self.get_dsv(
@@ -343,9 +424,9 @@ class Catalog(Resource):
                 for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([i in x if (includes.get(i) == '') else (
+                    all([(i in x) if (includes.get(i) == '') else (
                         includes.get(i) == x.get(i)) for i in includes])) and
-                not any([e in x if (excludes.get(e) == '') else (
+                not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == x.get(e)) for e in excludes])]
         else:
             attributes = [
@@ -355,9 +436,9 @@ class Catalog(Resource):
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([i in x if (includes.get(i) == '') else (
+                    all([(i in x) if (includes.get(i) == '') else (
                         includes.get(i) == x.get(i)) for i in includes])) and
-                not any([e in x if (excludes.get(e) == '') else (
+                not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == x.get(e)) for e in excludes])]
 
         if item is not None:
@@ -517,14 +598,16 @@ for cat in catdict:
 logger.info('Creating alias dictionary and position arrays...')
 ras = []
 decs = []
+all_events = []
 for cat in catdict:
     for event in catalogs[cat]:
+        all_events.append(event)
         levent = catalogs[cat].get(event, {})
         laliases = levent.get('alias', [])
         laliases = list(set([event] + [x['value'] for x in laliases]))
         for alias in laliases:
-            aliases.setdefault(alias.lower().replace(' ', '').replace(
-                '-', ''), []).append([cat, event, alias])
+            aliases.setdefault(alias.lower().replace(' ', ''),
+                []).append([cat, event, alias])
         lra = levent.get('ra')
         ldec = levent.get('dec')
         if lra is None and ldec is None:
@@ -539,6 +622,7 @@ for cat in catdict:
         ras.append(lra)
         decs.append(ldec)
 
+all_events = list(sorted(set(all_events)))
 coo = coord(ras, decs, unit=(un.hourangle, un.deg))
 
 logger.info('Launching API...')
