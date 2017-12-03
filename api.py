@@ -22,7 +22,7 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-    #    ('sne', 'supernovae'),
+    ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
     ('kilonova', 'kilonovae')
 ))
@@ -274,11 +274,10 @@ class Catalog(Resource):
             elif qname is None and aname is None:
                 return catalogs.get(catalog_name, {})
 
-        if fmt is not None and (qname is None or aname is None):
+        if fmt is not None and qname is None:
             return Response((
                 'Error: "{}" format only supported if quantity '
-                'and attribute are specified (e.g. '
-                'SN2014J/photometry/magnitude).').format(
+                'is specified.').format(
                     fmt), mimetype='text/plain')
         # Events
         event_names = [] if ename is None else ename.split('+')
@@ -383,13 +382,11 @@ class Catalog(Resource):
                                  for x in my_quantity])]))))
 
                     if aname is None:
-                        logger.info(includes)
-                        logger.info(my_event_dict)
                         if not len(includes) or all([
                             (i in my_event_dict) if (
                                 includes.get(i) == '') else (
-                                includes.get(i) in [
-                                    v.get('value', '') for v in
+                                includes.get(i).lower() in [
+                                    v.get('value', '').lower() for v in
                                     my_event_dict.get(
                                         i, [])]) for i in includes]):
                             qdict[quantity] = [x for xi, x in enumerate(
@@ -439,7 +436,8 @@ class Catalog(Resource):
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
-                        includes.get(i) == x.get(i)) for i in includes])) and
+                        includes.get(i).lower() == x.get(i).lower())
+                        for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == x.get(e)) for e in excludes])]
         else:
@@ -451,7 +449,8 @@ class Catalog(Resource):
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
-                        includes.get(i) == x.get(i)) for i in includes])) and
+                        includes.get(i).lower() == x.get(i).lower())
+                        for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == x.get(e)) for e in excludes])]
 
@@ -481,14 +480,14 @@ class Catalog(Resource):
 
         if len(enames) > 1:
             rax = 'e'
-            if len(qnames) > 1:
+            if not len(anames) and len(qnames):
+                cax = 'a'
+            elif len(qnames) > 1:
                 cax = 'q'
                 if len(anames) > 1:
                     return Response(
                         '{} not supported for this query type.'.format(
                             fmt.upper()), mimetype='text/plain')
-            elif len(anames) > 0:
-                cax = 'a'
         elif len(qnames) > 1:
             rax = 'q'
             if len(anames) > 0:
@@ -508,7 +507,7 @@ class Catalog(Resource):
         if cax == 'q':
             colheaders = list(qnames)
         elif cax == 'a':
-            colheaders = list(anames)
+            colheaders = list(anames if anames else qnames)
             if rax == 'e':
                 colheaders.insert(0, self._AXSUB[rax])
 
@@ -526,9 +525,15 @@ class Catalog(Resource):
                 outarr = [[delim.join(q) if is_list(q) else q
                            for q in e] for e in outarr]
             elif cax == 'a':
-                outarr = [i for s in [
-                    [[enames[ei]] + q for q in edict[e][qname]]
-                    for ei, e in enumerate(edict)] for i in s]
+                if not anames:
+                    outarr = [i for s in [
+                        [[enames[ei]] + [','.join([v.get('value', '') for v in edict[e][q]])
+                            for q in edict[e]]]
+                        for ei, e in enumerate(edict)] for i in s]
+                else:
+                    outarr = [i for s in [
+                        [[enames[ei]] + q for q in edict[e][qname]]
+                        for ei, e in enumerate(edict)] for i in s]
             else:
                 outarr = [edict[e][qname] for e in edict]
         elif rax == 'q':
