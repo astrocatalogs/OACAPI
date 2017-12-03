@@ -34,6 +34,8 @@ There are a few arguments that have special meaning and are only a part of the A
 * `format=x`: Return data in the specified format `x`, currently supports `csv` and `tsv`. Any other format specification will return `JSON`.
 * `item=n`: Return only the `n`th item of each of the listed quantities.
 * `radius=r`: Return events within a distance `r` (in arcseconds) of a given set of `ra` and `dec` coordinates. Note that this disables exact matches for `ra` and `dec`.
+* `width=w`: Return events within a distance `w` (in arcseconds) of a given `ra` value (for box searches).
+* `height=h`: Return events within a distance `h` (in arcseconds) of a given `dec` value (for box searches).
 
 ## Example queries
 
@@ -43,7 +45,7 @@ https://api.astrocats.space?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
 By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from the catalog when searching by a criterion such as position, the user should insert `all/` into the URL before the rest of the query, as shown in the example below:
 
-#### Redshifts of all supernovae within 5° of a coordinate
+#### Redshifts of all events within 5° of a coordinate, in CSV format
 
 https://api.astrocats.space/all/redshift/value?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv
 
@@ -82,16 +84,28 @@ https://api.astrocats.space/SN2014J/photometry/time+magnitude+e_magnitude+band?e
 
 https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?band=B
 
+In the following example, we filter upon the `value` of `claimedtype`, but note that this filters `lumdist` as well, since the `value` filter applies to both:
+
+#### Luminosity distances and claimed types of all events with luminosity distance *and* claimed type equal to Ia (probably not what you intend!)
+
+https://api.astrocats.space/all/lumdist+claimedtype?value=ia
+
+Note that the above returns an empty result. Instead, we want to do:
+
+#### Luminosity distances and claimed types of all events with an available luminosity distance and "Ia" listed as a type, in TSV format
+
+https://api.astrocats.space/all/lumdist+claimedtype?lumdist&claimedtype=ia&format=tsv
+
 #### Return the spectrum closest to the listed MJD
 
-https://api.astrocats.space/SN2014J/spectra/time?time=56703.2&closest
+https://api.astrocats.space/SN2014J/spectra/time+data?time=56703.2&closest
 
 The `all/` route (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
 
-#### Return all photometry in a 2" radius about a coordinate
+#### Return all photometry in a 2" radius about a coordinate, in CSV format
 
 https://api.astrocats.space/all/photometry/time+band+magnitude?ra=21:23:32.16&dec=-53:01:36.08&radius=2&format=csv
 
-#### Return the instruments used to produce spectra within a 5° of a given coordinate
+#### Return the instruments used to produce spectra within a 5° of a given coordinate, in CSV format
 
 https://api.astrocats.space/all/spectra/instrument?ra=21:23:32.16&dec=-53:01:36.08&radius=18000&format=csv
