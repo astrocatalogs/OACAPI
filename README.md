@@ -1,5 +1,7 @@
 # Open Astronomy Catalog API v1.0
 
+[![Website](https://img.shields.io/website-up-down-green-red/https/api.astrocats.space.svg?label=API-status)]()
+
 The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the Open Astronomy Catalogs (e.g. the Open Supernova, Tidal Disruption, and Kilonova Catalogs). The API is accessible via a route that works via any of the catalog domains,
 
 https://api.astrocats.space/
@@ -71,6 +73,10 @@ https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?comple
 #### Return observations for multiple events at once, in CSV format
 
 https://api.astrocats.space/SN2014J+SN2015F/photometry/time+magnitude+band?format=csv
+
+#### Return only observations whose attributes include the listed keys (`e_magnitude` and `band`)
+
+https://api.astrocats.space/SN2014J/photometry/time+magnitude+e_magnitude+band?e_magnitude&band
 
 #### Return only observations matching given criteria, in this case band = B
 
