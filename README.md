@@ -53,7 +53,7 @@ In the following example, we filter upon the `value` of `claimedtype`, but note 
 
 #### Luminosity distances and claimed types of all events with luminosity distance *and* claimed type `= "Ia"` (probably not what you intend!)
 
-https://api.astrocats.space/all/lumdist+claimedtype?lumdist&claimedtype=ia
+https://api.astrocats.space/all/lumdist+claimedtype?value=ia
 
 Note that the above returns an empty result. Instead, we want to do:
 
