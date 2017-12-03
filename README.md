@@ -51,13 +51,13 @@ https://api.astrocats.space/all/redshift/value?ra=10:42:16.88&dec=-24:13:12.13&r
 
 In the following example, we filter upon the `value` of `claimedtype`, but note that this filters `lumdist` as well, since the `value` filter applies to both:
 
-#### Luminosity distances and claimed types of all events with luminosity distance *and* claimed type `= "Ia"` (probably not what you intend!)
+#### Luminosity distances and claimed types of all events with luminosity distance *and* claimed type equal to Ia (probably not what you intend!)
 
 https://api.astrocats.space/all/lumdist+claimedtype?value=ia
 
 Note that the above returns an empty result. Instead, we want to do:
 
-#### Luminosity distances and claimed types of all events with an available luminosity distance and `"Ia"` listed as a type, in TSV format
+#### Luminosity distances and claimed types of all events with an available luminosity distance and "Ia" listed as a type, in TSV format
 
 https://api.astrocats.space/all/lumdist+claimedtype?lumdist&claimedtype=ia&format=tsv
 
