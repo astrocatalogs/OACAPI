@@ -166,10 +166,15 @@ class Catalog(Resource):
         qname = quantity_name
         aname = attribute_name
 
+        req_vals = request.get_json()
+        
+        if not req_vals:
+            req_vals = request.values
+
         # Load event/quantity/attribute if provided by request.
-        event_req = request.values.get('event')
-        quantity_req = request.values.get('quantity')
-        attribute_req = request.values.get('attribute')
+        event_req = req_vals.get('event')
+        quantity_req = req_vals.get('quantity')
+        attribute_req = req_vals.get('attribute')
         if ename is None and event_req is not None:
             if not isinstance(event_req, string_types):
                 ename = '+'.join(listify(event_req))
@@ -188,33 +193,33 @@ class Catalog(Resource):
 
         # Options
         if not use_full:
-            rfull = request.values.get('full')
+            rfull = req_vals.get('full')
             if rfull is not None:
                 return self.retrieve(
                     catalog_name, ename, qname, aname, True)
 
-        fmt = request.values.get('format')
+        fmt = req_vals.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
 
-        ra = request.values.get('ra')
-        dec = request.values.get('dec')
-        radius = request.values.get('radius')
-        width = request.values.get('width')
-        height = request.values.get('height')
-        complete = request.values.get('complete')
-        first = request.values.get('first')
-        closest = request.values.get('closest')
+        ra = req_vals.get('ra')
+        dec = req_vals.get('dec')
+        radius = req_vals.get('radius')
+        width = req_vals.get('width')
+        height = req_vals.get('height')
+        complete = req_vals.get('complete')
+        first = req_vals.get('first')
+        closest = req_vals.get('closest')
 
         include_keys = list(
             sorted(set(request.args.keys()) - self._SPECIAL_ATTR))
         includes = OrderedDict()
         for key in include_keys:
-            includes[key] = request.values.get(key)
+            includes[key] = req_vals.get(key)
 
         excludes = OrderedDict([('realization', '')])
 
         if first is None:
-            item = request.values.get('item')
+            item = req_vals.get('item')
             try:
                 item = int(item)
             except Exception:
