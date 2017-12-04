@@ -179,12 +179,12 @@ class Catalog(Resource):
             if not isinstance(quantity_req, string_types):
                 qname = '+'.join(listify(quantity_req))
             else:
-                qname = event_req
+                qname = quantity_req
         if aname is None and attribute_req is not None:
             if not isinstance(attribute_req, string_types):
                 aname = '+'.join(listify(attribute_req))
             else:
-                aname = event_req
+                aname = attribute_req
 
         # Options
         if not use_full:
