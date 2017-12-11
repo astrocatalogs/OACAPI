@@ -117,7 +117,7 @@ class Catalog(Resource):
         'spectra': ['data']
     }
     _EXPENSIVE_LIMIT = 100
-    _NO_CSV = ['data']
+    _NO_CSV = []
     _FULL_LIMIT = 1000
     _AXSUB = {
         'e': 'event',
@@ -478,6 +478,22 @@ class Catalog(Resource):
         ename = enames[0]
         qname = qnames[0]
 
+        # Special case: Data array from a spectrum.
+        if 'spectra' in qnames and 'data' in anames:
+            if len(enames) != 1 or len(qnames) != 1 or len(anames) != 1:
+                return {'message':
+                        'When retrieving spectrum data in delimited format, must specify '
+                        'only one event and only request the "spectra" quantity.'}
+            attr = edict.get(ename, {}).get(qname, [])
+            if len(attr) != 1 or len(attr[0]) != 1:
+                return {'message':
+                        'When retrieving spectra in delimited format, exactly one '
+                        'at a time can be requested.'}
+            data_str = ''
+            for row in attr[0][0]:
+                data_str += ','.join(row) + '\n'
+            return Response(data_str, mimetype='text/plain')
+
         if fmt == 'csv':
             delim = ','
         elif fmt == 'tsv':
@@ -577,11 +593,12 @@ class Catalog(Resource):
             for i, row in enumerate(outarr):
                 outarr[i].insert(0, rowheaders[i])
 
-        return Response('\n'.join([
+        ret_str = '\n'.join([
             delim.join([
                 ('"' + delim.join(z) + '"') if is_list(
                     z) else z for z in y])
-            for y in outarr]), mimetype='text/plain')
+            for y in outarr])
+        return Response(ret_str, mimetype='text/plain')
 
 
 cn = '<string:catalog_name>'
