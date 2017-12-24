@@ -41,6 +41,13 @@ logger = logging.getLogger('gunicorn.error')
 logger.setLevel(logging.INFO)
 
 
+def replace_multiple(y, xs, rep):
+    """Match multiple strings to replace in sequence."""
+    for x in xs:
+        y = y.replace(x, rep)
+    return y
+
+
 def is_number(s):
     """Check if input is a number."""
     if isinstance(s, list) and not isinstance(s, string_types):
@@ -206,7 +213,7 @@ class Catalog(Resource):
         radius = req_vals.get('radius')
         width = req_vals.get('width')
         height = req_vals.get('height')
-        complete = req_vals.get('complete')
+        complete = req_vals.get('complete') or full
         first = req_vals.get('first')
         closest = req_vals.get('closest')
 
@@ -434,9 +441,7 @@ class Catalog(Resource):
         """Return array of attributes."""
         if complete is None:
             attributes = [
-                [','.join(sources[[int(y) - 1 for y in x.get(
-                    a, '').split(',')]])
-                 if a == 'source' else x.get(a, '') for a in anames]
+                [x.get(a, '') for a in anames]
                 for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
@@ -647,7 +652,11 @@ for cat in catdict:
         all_events.append(event)
         levent = catalogs[cat].get(event, {})
         laliases = levent.get('alias', [])
-        laliases = list(set([event] + [x['value'] for x in laliases]))
+        laliases = list(set([event.lower()] + [x['value'].lower() for x in laliases] + [
+            replace_multiple(x['value'].lower(), ['sn', 'at'], '')
+            for x in laliases if x['value'].lower().startswith(('sn', 'at'))] + [
+            replace_multiple(x['value'].lower(), ['-', '–'], '')
+            for x in laliases]))
         for alias in laliases:
             aliases.setdefault(alias.lower().replace(' ', ''),
                                []).append([cat, event, alias])
