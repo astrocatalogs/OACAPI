@@ -167,7 +167,7 @@ class Catalog(Resource):
         aname = attribute_name
 
         req_vals = request.get_json()
-        
+
         if not req_vals:
             req_vals = request.values
 
@@ -467,6 +467,7 @@ class Catalog(Resource):
 
         return attributes
 
+    @api.representation('text/plain')
     def get_dsv(self, edict, enames, qnames, anames, fmt='csv'):
         """Get delimited table."""
         if fmt not in ['csv', 'tsv']:
@@ -534,7 +535,8 @@ class Catalog(Resource):
             elif cax == 'a':
                 if not anames:
                     outarr = [i for s in [
-                        [[enames[ei]] + [','.join([v.get('value', '') for v in edict[e][q]])
+                        [[enames[ei]] + [
+                            ','.join([v.get('value', '') for v in edict[e][q]])
                             for q in edict[e]]]
                         for ei, e in enumerate(edict)] for i in s]
                 else:
