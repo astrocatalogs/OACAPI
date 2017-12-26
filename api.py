@@ -9,10 +9,10 @@ from timeit import default_timer as timer
 import numpy as np
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
+from flask import Flask, Response, request
 from six import string_types
 from werkzeug.contrib.fixers import ProxyFix
 
-from flask import Flask, Response, request
 from flask_compress import Compress
 from flask_restful import Api, Resource
 
@@ -451,7 +451,7 @@ class Catalog(Resource):
             attributes = [
                 ([','.join(sources[[int(y) - 1 for y in x.get(
                     a, '').split(',')]])
-                 if a == 'source' else x.get(a, '') for a in anames]
+                  if a == 'source' else x.get(a, '') for a in anames]
                  if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if any(
                     [x.get(a) is not None for a in anames]) and all(
@@ -467,7 +467,7 @@ class Catalog(Resource):
             attributes = [
                 ([','.join(sources[[int(y) - 1 for y in x.get(
                     a, '').split(',')]])
-                 if a == 'source' else x.get(a, '') for a in anames]
+                  if a == 'source' else x.get(a, '') for a in anames]
                  if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
@@ -501,14 +501,17 @@ class Catalog(Resource):
         # Special case: Data array from a spectrum.
         if 'spectra' in qnames and 'data' in anames:
             if len(enames) != 1 or len(qnames) != 1 or len(anames) != 1:
-                return {'message':
-                        'When retrieving spectrum data in delimited format, must specify '
-                        'only one event and only request the "spectra" quantity.'}
+                return {
+                    'message':
+                    'When retrieving spectrum data in delimited format, must '
+                    'specify only one event and only request the "spectra" '
+                    'quantity.'}
             attr = edict.get(ename, {}).get(qname, [])
             if len(attr) != 1 or len(attr[0]) != 1:
-                return {'message':
-                        'When retrieving spectra in delimited format, exactly one '
-                        'at a time can be requested.'}
+                return {
+                    'message':
+                    'When retrieving spectra in delimited format, exactly one '
+                    'at a time can be requested.'}
             data_str = ''
             for row in attr[0][0]:
                 data_str += ','.join(row) + '\n'
