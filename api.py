@@ -41,6 +41,13 @@ logger = logging.getLogger('gunicorn.error')
 logger.setLevel(logging.INFO)
 
 
+def replace_multiple(y, xs, rep):
+    """Match multiple strings to replace in sequence."""
+    for x in xs:
+        y = y.replace(x, rep)
+    return y
+
+
 def is_number(s):
     """Check if input is a number."""
     if isinstance(s, list) and not isinstance(s, string_types):
@@ -117,7 +124,7 @@ class Catalog(Resource):
         'spectra': ['data']
     }
     _EXPENSIVE_LIMIT = 100
-    _NO_CSV = ['data']
+    _NO_CSV = []
     _FULL_LIMIT = 1000
     _AXSUB = {
         'e': 'event',
@@ -134,7 +141,11 @@ class Catalog(Resource):
         'complete',
         'first',
         'closest',
-        'item'
+        'item',
+        'full'
+    ])
+    _ALWAYS_FULL = set([
+        'source'
     ])
 
     def post(self, *args, **kwargs):
@@ -196,7 +207,9 @@ class Catalog(Resource):
             rfull = req_vals.get('full')
             if rfull is not None:
                 return self.retrieve(
-                    catalog_name, ename, qname, aname, True)
+                    catalog_name, event_name=ename,
+                    quantity_name=qname, attribute_name=aname,
+                    full=True)
 
         fmt = req_vals.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
@@ -405,7 +418,8 @@ class Catalog(Resource):
                                 pass
                     else:
                         qdict[quantity] = self.get_attributes(
-                            attribute_names, my_quantity, complete, item,
+                            attribute_names, my_quantity, complete=complete,
+                            full=use_full, item=item,
                             includes=includes, excludes=excludes,
                             closest_locs=closest_locs,
                             sources=np.array(sources.get(my_event, [])))
@@ -420,7 +434,8 @@ class Catalog(Resource):
 
         if not full and use_full:
             return self.retrieve(
-                catalog_name, ename, qname, aname, True)
+                catalog_name, event_name=ename, quantity_name=qname,
+                attribute_name=aname, full=True)
 
         if fmt is not None:
             return self.get_dsv(
@@ -429,16 +444,19 @@ class Catalog(Resource):
         return edict
 
     def get_attributes(
-        self, anames, quantity, complete=None, item=None, includes={},
+        self, anames, quantity, complete=None, full=False, item=None, includes={},
             excludes={}, closest_locs=[], sources=[]):
         """Return array of attributes."""
         if complete is None:
             attributes = [
-                [','.join(sources[[int(y) - 1 for y in x.get(
+                ([','.join(sources[[int(y) - 1 for y in x.get(
                     a, '').split(',')]])
                  if a == 'source' else x.get(a, '') for a in anames]
+                 if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if any(
-                    [x.get(a) is not None for a in anames]) and (
+                    [x.get(a) is not None for a in anames]) and all(
+                    [x.get(a) is not None for a in
+                        self._ALWAYS_FULL.intersection(anames)]) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
                         includes.get(i).lower() == x.get(i).lower())
@@ -447,9 +465,10 @@ class Catalog(Resource):
                     excludes.get(e) == x.get(e)) for e in excludes])]
         else:
             attributes = [
-                [','.join(sources[[int(y) - 1 for y in x.get(
+                ([','.join(sources[[int(y) - 1 for y in x.get(
                     a, '').split(',')]])
                  if a == 'source' else x.get(a, '') for a in anames]
+                 if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
@@ -478,6 +497,22 @@ class Catalog(Resource):
 
         ename = enames[0]
         qname = qnames[0]
+
+        # Special case: Data array from a spectrum.
+        if 'spectra' in qnames and 'data' in anames:
+            if len(enames) != 1 or len(qnames) != 1 or len(anames) != 1:
+                return {'message':
+                        'When retrieving spectrum data in delimited format, must specify '
+                        'only one event and only request the "spectra" quantity.'}
+            attr = edict.get(ename, {}).get(qname, [])
+            if len(attr) != 1 or len(attr[0]) != 1:
+                return {'message':
+                        'When retrieving spectra in delimited format, exactly one '
+                        'at a time can be requested.'}
+            data_str = ''
+            for row in attr[0][0]:
+                data_str += ','.join(row) + '\n'
+            return Response(data_str, mimetype='text/plain')
 
         if fmt == 'csv':
             delim = ','
@@ -579,11 +614,12 @@ class Catalog(Resource):
             for i, row in enumerate(outarr):
                 outarr[i].insert(0, rowheaders[i])
 
-        return Response('\n'.join([
+        ret_str = '\n'.join([
             delim.join([
                 ('"' + delim.join(z) + '"') if is_list(
                     z) else z for z in y])
-            for y in outarr]), mimetype='text/plain')
+            for y in outarr])
+        return Response(ret_str, mimetype='text/plain')
 
 
 cn = '<string:catalog_name>'
@@ -632,7 +668,11 @@ for cat in catdict:
         all_events.append(event)
         levent = catalogs[cat].get(event, {})
         laliases = levent.get('alias', [])
-        laliases = list(set([event] + [x['value'] for x in laliases]))
+        laliases = list(set([event.lower()] + [x['value'].lower() for x in laliases] + [
+            replace_multiple(x['value'].lower(), ['sn', 'at'], '')
+            for x in laliases if x['value'].lower().startswith(('sn', 'at'))] + [
+            replace_multiple(x['value'].lower(), ['-', '–'], '')
+            for x in laliases]))
         for alias in laliases:
             aliases.setdefault(alias.lower().replace(' ', ''),
                                []).append([cat, event, alias])
