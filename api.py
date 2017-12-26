@@ -141,7 +141,11 @@ class Catalog(Resource):
         'complete',
         'first',
         'closest',
-        'item'
+        'item',
+        'full'
+    ])
+    _ALWAYS_FULL = set([
+        'source'
     ])
 
     def post(self, *args, **kwargs):
@@ -203,7 +207,9 @@ class Catalog(Resource):
             rfull = req_vals.get('full')
             if rfull is not None:
                 return self.retrieve(
-                    catalog_name, ename, qname, aname, True)
+                    catalog_name, event_name=ename,
+                    quantity_name=qname, attribute_name=aname,
+                    full=True)
 
         fmt = req_vals.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
@@ -213,7 +219,7 @@ class Catalog(Resource):
         radius = req_vals.get('radius')
         width = req_vals.get('width')
         height = req_vals.get('height')
-        complete = req_vals.get('complete') or full
+        complete = req_vals.get('complete')
         first = req_vals.get('first')
         closest = req_vals.get('closest')
 
@@ -412,7 +418,8 @@ class Catalog(Resource):
                                 pass
                     else:
                         qdict[quantity] = self.get_attributes(
-                            attribute_names, my_quantity, complete, item,
+                            attribute_names, my_quantity, complete=complete,
+                            full=use_full, item=item,
                             includes=includes, excludes=excludes,
                             closest_locs=closest_locs,
                             sources=np.array(sources.get(my_event, [])))
@@ -427,7 +434,8 @@ class Catalog(Resource):
 
         if not full and use_full:
             return self.retrieve(
-                catalog_name, ename, qname, aname, True)
+                catalog_name, event_name=ename, quantity_name=qname,
+                attribute_name=aname, full=True)
 
         if fmt is not None:
             return self.get_dsv(
@@ -436,14 +444,19 @@ class Catalog(Resource):
         return edict
 
     def get_attributes(
-        self, anames, quantity, complete=None, item=None, includes={},
+        self, anames, quantity, complete=None, full=False, item=None, includes={},
             excludes={}, closest_locs=[], sources=[]):
         """Return array of attributes."""
         if complete is None:
             attributes = [
-                [x.get(a, '') for a in anames]
+                ([','.join(sources[[int(y) - 1 for y in x.get(
+                    a, '').split(',')]])
+                 if a == 'source' else x.get(a, '') for a in anames]
+                 if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if any(
-                    [x.get(a) is not None for a in anames]) and (
+                    [x.get(a) is not None for a in anames]) and all(
+                    [x.get(a) is not None for a in
+                        self._ALWAYS_FULL.intersection(anames)]) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
                         includes.get(i).lower() == x.get(i).lower())
@@ -452,9 +465,10 @@ class Catalog(Resource):
                     excludes.get(e) == x.get(e)) for e in excludes])]
         else:
             attributes = [
-                [','.join(sources[[int(y) - 1 for y in x.get(
+                ([','.join(sources[[int(y) - 1 for y in x.get(
                     a, '').split(',')]])
                  if a == 'source' else x.get(a, '') for a in anames]
+                 if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and (
                     (len(closest_locs) and xi in closest_locs) or
