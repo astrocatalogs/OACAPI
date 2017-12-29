@@ -9,7 +9,7 @@ from timeit import default_timer as timer
 import numpy as np
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
-from flask import Flask, Response, request
+from flask import Flask, Response, request, make_response
 from six import string_types
 from werkzeug.contrib.fixers import ProxyFix
 
@@ -150,7 +150,9 @@ class Catalog(Resource):
 
     def post(self, *args, **kwargs):
         """Handle POST request."""
-        return self.get(*args, **kwargs), 200
+        result = self.get(*args, **kwargs)
+        logger.info(result)
+        return result, 200
 
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
@@ -165,6 +167,14 @@ class Catalog(Resource):
                                quantity_name, attribute_name, False)
         end = timer()
         logger.info('Time to perform query: {}s'.format(end - start))
+        if isinstance(result, Response):
+            logger.info('Query successful!')
+        elif 'message' in result:
+            logger.info('Query unsuccessful, message: {}'.format(result['message']))
+        elif not result:
+            logger.info('Query unsuccessful, no results returned.')
+        else:
+            logger.info('Query successful!')
         return result
 
     def retrieve(self, catalog_name, event_name=None, quantity_name=None,
@@ -490,7 +500,7 @@ class Catalog(Resource):
     def get_dsv(self, edict, enames, qnames, anames, fmt='csv'):
         """Get delimited table."""
         if fmt not in ['csv', 'tsv']:
-            return Response('Unknown format.', mimetype='text/plain')
+            return 'Unknown format.'
         # Determine which to use as axes in CSV/TSV file.
         rax = None
         cax = None
@@ -501,21 +511,19 @@ class Catalog(Resource):
         # Special case: Data array from a spectrum.
         if 'spectra' in qnames and 'data' in anames:
             if len(enames) != 1 or len(qnames) != 1 or len(anames) != 1:
-                return {
-                    'message':
+                return (
                     'When retrieving spectrum data in delimited format, must '
                     'specify only one event and only request the "spectra" '
-                    'quantity.'}
+                    'quantity.')
             attr = edict.get(ename, {}).get(qname, [])
             if len(attr) != 1 or len(attr[0]) != 1:
-                return {
-                    'message':
+                return (
                     'When retrieving spectra in delimited format, exactly one '
-                    'at a time can be requested.'}
+                    'at a time can be requested.')
             data_str = ''
             for row in attr[0][0]:
                 data_str += ','.join(row) + '\n'
-            return Response(data_str, mimetype='text/plain')
+            return data_str
 
         if fmt == 'csv':
             delim = ','
@@ -529,9 +537,8 @@ class Catalog(Resource):
             elif len(qnames) > 1:
                 cax = 'q'
                 if len(anames) > 1:
-                    return Response(
-                        '{} not supported for this query type.'.format(
-                            fmt.upper()), mimetype='text/plain')
+                    return '{} not supported for this query type.'.format(
+                        fmt.upper())
             elif len(anames) > 0:
                 cax = 'a'
         elif len(qnames) > 1:
@@ -622,7 +629,9 @@ class Catalog(Resource):
                 ('"' + delim.join(z) + '"') if is_list(
                     z) else z for z in y])
             for y in outarr])
-        return Response(ret_str, mimetype='text/plain')
+        resp = make_response(ret_str)
+        resp.mimetype = 'text/plain'
+        return resp
 
 
 cn = '<string:catalog_name>'
