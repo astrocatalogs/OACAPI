@@ -9,7 +9,7 @@ from timeit import default_timer as timer
 import numpy as np
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
-from flask import Flask, Response, request, make_response
+from flask import Flask, Response, request, make_response, jsonify
 from six import string_types
 from werkzeug.contrib.fixers import ProxyFix
 
@@ -43,11 +43,11 @@ logger.setLevel(logging.INFO)
 messages = json.load(open('messages.json', 'r'))
 
 
-def msg(name, reps):
+def msg(name, reps=[]):
     """Construct a response from the message dictinoary."""
     return {'message':messages.get(
         name, messages.get('no_message', '')).format(
-            listify(reps))}
+            *listify(reps))}
 
 
 def replace_multiple(y, xs, rep):
@@ -100,23 +100,6 @@ def bool_str(x):
     return 'T' if x else 'F'
 
 
-class Info(Resource):
-    """Return basic info about catalog."""
-
-    _infotxt = open('info.html', 'r').read()
-
-    def get(self, catalog_name):
-        """Return HTML page."""
-        route_msg = ''
-        if catalog_name != 'astrocats':
-            route_msg = (
-                'For this particular route, events from the "{}" '
-                'catalog will be matched against first.').format(
-                catdict.get(catalog_name))
-        itxt = self._infotxt.replace('$ROUTE_MSG', route_msg)
-        return Response(itxt, mimetype='text/html')
-
-
 class Catalogs(Resource):
     """Return all catalogs."""
 
@@ -126,7 +109,7 @@ class Catalogs(Resource):
 
 
 class Catalog(Resource):
-    """Return single event."""
+    """Return event info."""
 
     _ANGLE_LIMIT = 36000.0
     _EXPENSIVE = {
@@ -371,7 +354,7 @@ class Catalog(Resource):
                     if opt[0] != catalog_name:
                         my_cat, my_event, my_alias = tuple(opt)
             if not my_cat:
-                return msg('not_found', event)
+                return msg('event_not_found', event)
             if full:
                 fcatalogs.update(json.load(
                     open(os.path.join(
@@ -639,7 +622,6 @@ en = '<string:event_name>'
 qn = '<string:quantity_name>'
 an = '<string:attribute_name>'
 
-# api.add_resource(Info, '/<string:catalog_name>/')
 api.add_resource(Catalogs, '/'.join(['', cn, 'catalogs']))
 api.add_resource(
     Catalog,

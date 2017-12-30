@@ -1,0 +1,11 @@
+{
+    "event_not_found":"Event '{}' not found in any catalog.",
+    "height_limited":"Height limited to {} degrees.",
+    "max_events":"Maximum event limit ({}) exceeded.",
+    "no_delimited":"This query does not support delimited output.",
+    "no_objects":"No objects found within specified search region.",
+    "no_root_data":"Welcome to the API of the Open Astronomy Catalogs! Please see https://github.com/astrocatalogs/OACAPI for API examples.",
+    "radius_limited":"Radius limited to {} degrees.",
+    "too_expensive":"Query too expensive, we suggest cloning the OAC catalogs locally (see e.g. https://sne.space/download/.",
+    "width_limited":"Width limited to {} degrees."
+}
