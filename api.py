@@ -40,6 +40,15 @@ decregex = re.compile("^[+-]?[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 logger = logging.getLogger('gunicorn.error')
 logger.setLevel(logging.INFO)
 
+messages = json.load(open('messages.json', 'r'))
+
+
+def msg(name, reps):
+    """Construct a response from the message dictinoary."""
+    return {'message':messages.get(
+        name, messages.get('no_message', '')).format(
+            listify(reps))}
+
 
 def replace_multiple(y, xs, rep):
     """Match multiple strings to replace in sequence."""
@@ -255,24 +264,21 @@ class Catalog(Resource):
             except Exception:
                 radius = 0.0
             if radius >= self._ANGLE_LIMIT:
-                return {'message': 'Radius limited to {} degrees.'.format(
-                    self._ANGLE_LIMIT / 3600.)}
+                return msg('radius_limited', self._ANGLE_LIMIT / 3600.)
         if width is not None:
             try:
                 width = float(width)
             except Exception:
                 width = 0.0
             if width >= self._ANGLE_LIMIT:
-                return {'message': 'Width limited to {} degrees.'.format(
-                    self._ANGLE_LIMIT / 3600.)}
+                return msg('width_limited', self._ANGLE_LIMIT / 3600.)
         if height is not None:
             try:
                 height = float(height)
             except Exception:
                 height = 0.0
             if height >= self._ANGLE_LIMIT:
-                return {'message': 'Height limited to {} degrees.'.format(
-                    self._ANGLE_LIMIT / 3600.)}
+                return msg('height_limited', self._ANGLE_LIMIT / 3600.)
 
         if ename is None:
             if ra is not None and dec is not None:
@@ -297,10 +303,9 @@ class Catalog(Resource):
                     ename = '+'.join([rdnames[i].replace('+', '$PLUS$')
                                       for i in idxcat])
                 else:
-                    return {'message':
-                            'No objects found within specified search region.'}
+                    return msg('no_objects')
             elif qname is None and aname is None:
-                return catalogs.get(catalog_name, {})
+                return catalogs.get(catalog_name, msg('no_root_data'))
 
         if fmt is not None and qname is None:
             return Response((
@@ -340,21 +345,17 @@ class Catalog(Resource):
         ] if aname is None else aname.split('+')
 
         if use_full and len(event_names) > self._FULL_LIMIT:
-            return {'message': 'Maximum event limit ({}) exceeded'.format(
-                self._FULL_LIMIT)}
+            return msg('max_events', self._FULL_LIMIT)
 
         if fmt is not None and any([n in attribute_names
                                     for n in self._NO_CSV]):
-            return {'message': 'This query does not support delimited output'}
+            return msg('no_delimited')
 
         if len(event_names) > self._EXPENSIVE_LIMIT:
             for quantity in quantity_names:
                 for exp in self._EXPENSIVE:
                     if any([e in attribute_names for e in self._EXPENSIVE]):
-                        return {'message': (
-                            'Query too expensive, we suggest cloning the OAC '
-                            'catalogs locally (see e.g. '
-                            '"https://sne.space/download/").')}
+                        return msg('too_expensive')
 
         edict = OrderedDict()
         fcatalogs = OrderedDict()
@@ -370,8 +371,7 @@ class Catalog(Resource):
                     if opt[0] != catalog_name:
                         my_cat, my_event, my_alias = tuple(opt)
             if not my_cat:
-                return {'message':
-                        'Event "{}" not found in any catalog.'.format(event)}
+                return msg('not_found', event)
             if full:
                 fcatalogs.update(json.load(
                     open(os.path.join(
