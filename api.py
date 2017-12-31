@@ -9,7 +9,7 @@ from timeit import default_timer as timer
 import numpy as np
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
-from flask import Flask, Response, request, make_response, jsonify
+from flask import Flask, Response, request, jsonify
 from six import string_types
 from werkzeug.contrib.fixers import ProxyFix
 
@@ -28,6 +28,7 @@ catdict = OrderedDict((
 ))
 
 catalogs = OrderedDict()
+catalog_keys = OrderedDict()
 aliases = OrderedDict()
 coo = None
 rdnames = []
@@ -42,12 +43,15 @@ logger.setLevel(logging.INFO)
 
 messages = json.load(open('messages.json', 'r'))
 
+dsv_fmts = ['csv', 'tsv']
 
-def msg(name, reps=[]):
+
+def msg(name, reps=[], fmt=None):
     """Construct a response from the message dictinoary."""
-    return {'message':messages.get(
+    msg_txt = messages.get(
         name, messages.get('no_message', '')).format(
-            *listify(reps))}
+            *listify(reps))
+    return (msg_txt if fmt in dsv_fmts else {'message':msg_txt})
 
 
 def replace_multiple(y, xs, rep):
@@ -55,6 +59,10 @@ def replace_multiple(y, xs, rep):
     for x in xs:
         y = y.replace(x, rep)
     return y
+
+
+def valf(x):
+    return (x.get('value', '') if isinstance(x, dict) else x)
 
 
 def is_number(s):
@@ -80,7 +88,7 @@ def is_number(s):
 
 def is_list(x):
     """Check if object is a list (but not a string)."""
-    return isinstance(x, list) and not isinstance(x, string_types)
+    return (isinstance(x, list) and not isinstance(x, string_types))
 
 
 def listify(x):
@@ -134,7 +142,8 @@ class Catalog(Resource):
         'first',
         'closest',
         'item',
-        'full'
+        'full',
+        'download'
     ])
     _ALWAYS_FULL = set([
         'source'
@@ -143,7 +152,6 @@ class Catalog(Resource):
     def post(self, *args, **kwargs):
         """Handle POST request."""
         result = self.get(*args, **kwargs)
-        logger.info(result)
         return result, 200
 
     def get(self, catalog_name, event_name=None, quantity_name=None,
@@ -167,6 +175,16 @@ class Catalog(Resource):
             logger.info('Query unsuccessful, no results returned.')
         else:
             logger.info('Query successful!')
+
+        req_vals = request.get_json()
+        if req_vals and 'download' in req_vals:
+            ext = req_vals.get('format')
+            ext = '.' + ext.lower() if ext is not None else '.json'
+            if not isinstance(result, Response):
+                result = Response(result, mimetype='text/plain')
+            result.headers['Content-Disposition'] = (
+                'attachment; filename=' + ext)
+
         return result
 
     def retrieve(self, catalog_name, event_name=None, quantity_name=None,
@@ -263,7 +281,7 @@ class Catalog(Resource):
             if height >= self._ANGLE_LIMIT:
                 return msg('height_limited', self._ANGLE_LIMIT / 3600.)
 
-        if ename is None:
+        if ename and ename.lower() == 'catalog':
             if ra is not None and dec is not None:
                 lcoo = coord(ra, dec, unit=(un.hourangle, un.deg))
                 if (width is not None and height is not None and
@@ -287,14 +305,22 @@ class Catalog(Resource):
                                       for i in idxcat])
                 else:
                     return msg('no_objects')
-            elif qname is None and aname is None:
-                return catalogs.get(catalog_name, msg('no_root_data'))
+            elif catalog_name in catalogs:
+                ename = '+'.join([i.replace('+', '$PLUS$')
+                    for i in catalogs[catalog_name]])
+                search_all = True
+            else:
+                return msg('no_root_data')
 
-        if fmt is not None and qname is None:
-            return Response((
-                'Error: "{}" format only supported if quantity '
-                'is specified.').format(
-                    fmt), mimetype='text/plain')
+            if qname is None:
+                qname = '+'.join(catalog_keys[catalog_name])
+
+        #if fmt is not None and qname is None:
+        #    return Response((
+        #        'Error: \'{}\' format only supported if quantity '
+        #        'is specified.').format(
+        #            fmt), mimetype='text/plain')
+
         # Events
         event_names = [] if ename is None else ename.split('+')
         # Check for + in names
@@ -343,7 +369,9 @@ class Catalog(Resource):
         edict = OrderedDict()
         fcatalogs = OrderedDict()
         sources = OrderedDict()
+        new_event_names = []
         for event in event_names:
+            skip_entry = False
             my_cat, my_event = None, None
             alopts = aliases.get(event.lower().replace(' ', ''), [])
             for opt in alopts:
@@ -373,57 +401,73 @@ class Catalog(Resource):
                 # Check if user passed quantity or attribute names to filter
                 # by.
                 qdict = OrderedDict()
-                for quantity in quantity_names:
-                    if full:
-                        my_event_dict = fcatalogs.get(
-                            my_event, {})
-                    else:
-                        my_event_dict = catalogs.get(my_cat, {}).get(
-                            my_event, {})
-                    my_quantity = my_event_dict.get(quantity, {})
-                    closest_locs = []
-                    if closest is not None:
-                        closest_locs = list(sorted(list(set([
-                            np.argmin([abs(np.mean([
-                                float(y) for y in listify(x.get(i))]) - float(
-                                    includes[i])) for x in my_quantity])
-                            for i in includes if len(my_quantity) and
-                            is_number(includes[i]) and
-                            all([is_number(x.get(i))
-                                 for x in my_quantity])]))))
+                if full:
+                    my_event_dict = fcatalogs.get(
+                        my_event, {})
+                else:
+                    my_event_dict = catalogs.get(my_cat, {}).get(
+                        my_event, {})
 
-                    if aname is None:
-                        if not len(includes) or all([
-                            (i in my_event_dict) if (
-                                includes.get(i) == '') else (
-                                includes.get(i).lower() in [
-                                    v.get('value', '').lower() for v in
-                                    my_event_dict.get(
-                                        i, [])]) for i in includes]):
+                if aname is None:
+                    for incl in includes:
+                        incll = incl.lower()
+                        if incll not in my_event_dict or (
+                            includes[incl] != '' and not any([(x.get(
+                                'value', '') if isinstance(x, dict)
+                                else x).lower() == includes[incl].lower()
+                                for x in my_event_dict[incll]])):
+                            skip_entry = True
+                            break
+
+                if not skip_entry:
+                    for quantity in quantity_names:
+                        my_quantity = listify(my_event_dict.get(quantity, {}))
+                        closest_locs = []
+                        if closest is not None:
+                            closest_locs = list(sorted(list(set([
+                                np.argmin([abs(np.mean([
+                                    float(y) for y in listify(x.get(i))]) - float(
+                                        includes[i])) for x in my_quantity])
+                                for i in includes if len(my_quantity) and
+                                is_number(includes[i]) and
+                                all([is_number(x.get(i))
+                                     for x in my_quantity])]))))
+
+                        if aname is None and quantity in my_event_dict:
                             qdict[quantity] = [x for xi, x in enumerate(
                                 my_quantity) if not len(
                                     closest_locs) or xi in closest_locs]
 
-                        if item is not None:
-                            try:
-                                qdict[quantity] = qdict[quantity][item]
-                            except Exception:
-                                pass
-                    else:
-                        qdict[quantity] = self.get_attributes(
-                            attribute_names, my_quantity, complete=complete,
-                            full=use_full, item=item,
-                            includes=includes, excludes=excludes,
-                            closest_locs=closest_locs,
-                            sources=np.array(sources.get(my_event, [])))
 
-                    if not search_all and not qdict[quantity]:
-                        use_full = True
-                        break
+                            if item is not None:
+                                try:
+                                    qdict[quantity] = qdict[quantity][item]
+                                except Exception:
+                                    pass
+                        else:
+                            qdict[quantity] = self.get_attributes(
+                                attribute_names, my_quantity, complete=complete,
+                                full=use_full, item=item,
+                                includes=includes, excludes=excludes,
+                                closest_locs=closest_locs,
+                                sources=np.array(sources.get(my_event, [])))
+
+                        if not search_all and not qdict.get(quantity):
+                            use_full = True
+                            break
                 if not full and use_full:
+                    new_event_names = event_names
                     break
                 if qdict:
                     edict[event] = qdict
+
+            if not (skip_entry and (full or search_all)):
+                new_event_names.append(event)
+
+        logger.info([len(event_names), len(new_event_names)])
+        event_names = new_event_names
+        ename = '+'.join([i.replace('+', '$PLUS$')
+            for i in event_names])
 
         if not full and use_full:
             return self.retrieve(
@@ -431,7 +475,7 @@ class Catalog(Resource):
                 attribute_name=aname, full=True)
 
         if fmt is not None:
-            return self.get_dsv(
+            return self.get_event_dsv(
                 edict, event_names, quantity_names, attribute_names, fmt)
 
         return edict
@@ -452,7 +496,7 @@ class Catalog(Resource):
                         self._ALWAYS_FULL.intersection(anames)]) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
-                        includes.get(i).lower() == x.get(i).lower())
+                        includes.get(i).lower() == x.get(i, '').lower())
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == x.get(e)) for e in excludes])]
@@ -463,10 +507,11 @@ class Catalog(Resource):
                   if a == 'source' else x.get(a, '') for a in anames]
                  if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if all(
-                    [x.get(a) is not None for a in anames]) and (
+                    [x.get(a) is not None for a in anames]) and
+                    (not len(closest_locs) or xi in closest_locs) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
-                        includes.get(i).lower() == x.get(i).lower())
+                        includes.get(i).lower() == x.get(i, '').lower())
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == x.get(e)) for e in excludes])]
@@ -480,38 +525,30 @@ class Catalog(Resource):
         return attributes
 
     @api.representation('text/plain')
-    def get_dsv(self, edict, enames, qnames, anames, fmt='csv'):
+    def get_event_dsv(self, edict, enames, qnames, anames, fmt='csv'):
         """Get delimited table."""
-        if fmt not in ['csv', 'tsv']:
-            return 'Unknown format.'
+        if fmt not in dsv_fmts:
+            return msg('unknown_fmt')
         # Determine which to use as axes in CSV/TSV file.
         rax = None
         cax = None
 
-        ename = enames[0]
-        qname = qnames[0]
+        ename = enames[0] if enames else None
+        qname = qnames[0] if qnames else None
 
         # Special case: Data array from a spectrum.
         if 'spectra' in qnames and 'data' in anames:
             if len(enames) != 1 or len(qnames) != 1 or len(anames) != 1:
-                return (
-                    'When retrieving spectrum data in delimited format, must '
-                    'specify only one event and only request the "spectra" '
-                    'quantity.')
+                return msg('spectra_limits')
             attr = edict.get(ename, {}).get(qname, [])
             if len(attr) != 1 or len(attr[0]) != 1:
-                return (
-                    'When retrieving spectra in delimited format, exactly one '
-                    'at a time can be requested.')
+                return msg('one_spectra')
             data_str = ''
             for row in attr[0][0]:
                 data_str += ','.join(row) + '\n'
             return data_str
 
-        if fmt == 'csv':
-            delim = ','
-        elif fmt == 'tsv':
-            delim = '\t'
+        delim = ',' if fmt == 'csv' else '\t'
 
         if len(enames) > 1:
             rax = 'e'
@@ -520,9 +557,8 @@ class Catalog(Resource):
             elif len(qnames) > 1:
                 cax = 'q'
                 if len(anames) > 1:
-                    return '{} not supported for this query type.'.format(
-                        fmt.upper())
-            elif len(anames) > 0:
+                    return msg('fmt_unsupported', fmt.upper())
+            elif len(anames):
                 cax = 'a'
         elif len(qnames) > 1:
             rax = 'q'
@@ -563,9 +599,9 @@ class Catalog(Resource):
             elif cax == 'a':
                 if not anames:
                     outarr = [i for s in [
-                        [[enames[ei]] + [
-                            ','.join([v.get('value', '') for v in edict[e][q]])
-                            for q in edict[e]]]
+                        [[enames[ei]] + ([
+                            ','.join([valf(v) for v in listify(edict[e][q])])
+                            for q in edict[e]] if len(edict[e]) else [])]
                         for ei, e in enumerate(edict)] for i in s]
                 else:
                     outarr = [i for s in [
@@ -612,9 +648,7 @@ class Catalog(Resource):
                 ('"' + delim.join(z) + '"') if is_list(
                     z) else z for z in y])
             for y in outarr])
-        resp = make_response(ret_str)
-        resp.mimetype = 'text/plain'
-        return resp
+        return Response(ret_str, mimetype='text/plain')
 
 
 cn = '<string:catalog_name>'
@@ -627,8 +661,6 @@ api.add_resource(
     Catalog,
     '/'.join(['', cn]),
     '/'.join(['', cn]) + '/',
-    '/'.join(['', cn, 'catalog']),
-    '/'.join(['', cn, 'catalog']) + '/',
     '/'.join(['', cn, 'all', qn]),
     '/'.join(['', cn, 'all', qn]) + '/',
     '/'.join(['', cn, 'all', qn, an]),
@@ -651,15 +683,18 @@ for cat in catdict:
     catalogs[cat] = json.load(open(os.path.join(
         ac_path, catdict[cat], 'output', 'catalog.min.json'), 'r'),
         object_pairs_hook=OrderedDict)
-    catalogs[cat] = dict(zip([x['name']
-                              for x in catalogs[cat]], catalogs[cat]))
+    catalogs[cat] = OrderedDict(sorted(dict(
+        zip([x['name'] for x in catalogs[cat]], catalogs[cat])).items(),
+        key=lambda s: (s[0].upper(), s[0])))
 logger.info('Creating alias dictionary and position arrays...')
 ras = []
 decs = []
 all_events = []
 for cat in catdict:
+    catalog_keys[cat] = set()
     for event in catalogs[cat]:
         all_events.append(event)
+        catalog_keys[cat].update(list(catalogs[cat][event].keys()))
         levent = catalogs[cat].get(event, {})
         laliases = levent.get('alias', [])
         laliases = list(set([event.lower()] + [x['value'].lower() for x in laliases] + [
@@ -684,7 +719,7 @@ for cat in catdict:
         ras.append(lra)
         decs.append(ldec)
 
-all_events = list(sorted(set(all_events)))
+all_events = list(sorted(set(all_events), key=lambda s: (s.upper(), s)))
 coo = coord(ras, decs, unit=(un.hourangle, un.deg))
 
 logger.info('Launching API...')

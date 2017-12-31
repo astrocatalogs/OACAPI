@@ -1,11 +1,15 @@
 {
     "event_not_found":"Event '{}' not found in any catalog.",
+    "fmt_unsupported":"{} not supported for this query type.",
     "height_limited":"Height limited to {} degrees.",
     "max_events":"Maximum event limit ({}) exceeded.",
     "no_delimited":"This query does not support delimited output.",
     "no_objects":"No objects found within specified search region.",
     "no_root_data":"Welcome to the API of the Open Astronomy Catalogs! Please see https://github.com/astrocatalogs/OACAPI for API examples.",
+    "one_spectra":"When retrieving spectra in delimited format, exactly one at a time can be requested.",
     "radius_limited":"Radius limited to {} degrees.",
+    "spectra_limits":"When retrieving spectrum data in delimited format, must specify only one event and only request the 'spectra' quantity",
     "too_expensive":"Query too expensive, we suggest cloning the OAC catalogs locally (see e.g. https://sne.space/download/.",
+    "unknown_fmt":"Unknown format.",
     "width_limited":"Width limited to {} degrees."
 }
