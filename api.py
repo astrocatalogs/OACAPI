@@ -430,7 +430,7 @@ class Catalog(Resource):
                                         includes[i])) for x in my_quantity])
                                 for i in includes if len(my_quantity) and
                                 is_number(includes[i]) and
-                                all([is_number(x.get(i))
+                                all([is_number(x.get(i, ''))
                                      for x in my_quantity])]))))
 
                         if aname is None and quantity in my_event_dict:
