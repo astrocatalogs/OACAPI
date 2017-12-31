@@ -29,7 +29,7 @@ Key names that are usable in API calls can be found in the [OAC schema](https://
 
 There are a few arguments that have special meaning and are only a part of the API, not the schema:
 
-* `closest`: Return the quantities with the closest value to the specified attributes. If multiple attributes are specified, the closest to each will be return (e.g., `magnitude=15&time=56789&closest` would return *both* the observation with magnitude closest to 15 and time closest to 56789.
+* `closest`: Return the quantities with the closest value to the specified attributes. If multiple attributes are specified, the closest to each will be returned (e.g., `magnitude=15&time=56789&closest` would return *both* the observation with magnitude closest to 15 and time closest to 56789.
 * `complete`: Return only quantities containing all of the requested attributes.
 * `first`: Return only the first of each of the listed quantities.
 * `format=x`: Return data in the specified format `x`, currently supports `csv` and `tsv`. Any other format specification will return `JSON`.
@@ -44,11 +44,17 @@ There are a few arguments that have special meaning and are only a part of the A
 
 https://api.astrocats.space?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
-By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from the catalog when searching by a criterion such as position, the user should insert `all/` into the URL before the rest of the query, as shown in the example below:
+By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from a specific catalog when searching by a criterion such as position, the user should insert `catalog/` into the URL before the rest of the query of the specific catalog they are interested in, as shown in the example below:
 
-#### Redshifts of all events within 5° of a coordinate, in CSV format
+#### Redshifts of all supernovae with a redshift reported within 5° of a coordinate, in CSV format
 
-https://api.astrocats.space/all/redshift/value?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv
+https://api.sne.space/catalog/redshift?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv&redshift
+
+If the user instead wishes to return info on all events across all catalogs, the `all/` route should be used instead (any URL can be used with this route):
+
+#### Redshifts of all events with a redshift reported within 5° of a coordinate, in CSV format
+
+https://api.astrocats.space/all/redshift?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv&redshift
 
 Individual event queries can return more-detailed information about each event, including datafiles such as spectra. Below, we show some examples of this in action:
 
