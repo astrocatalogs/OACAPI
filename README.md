@@ -3,7 +3,7 @@
 [![Website](https://img.shields.io/website-up-down-green-red/https/api.astrocats.space.svg?label=status)](https://github.com/astrocatalogs/OACAPI)
 [![Calls](https://img.shields.io/badge/dynamic/json.svg?label=successful%20queries%20in%20last%20week&colorB=ff69b4&prefix=&suffix=&query=$.count&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php)](https://github.com/astrocatalogs/OACAPI)
 
-The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the Open Astronomy Catalogs (e.g. the Open Supernova, Tidal Disruption, and Kilonova Catalogs). The API is accessible via a route that works via any of the catalog domains,
+The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the Open Astronomy Catalogs (e.g. the <a href="https://sne.space">Open Supernova</a>, <a href="https://tde.space">Tidal Disruption</a>, and <a href="https://kilonova.space">Kilonova</a> Catalogs). The API is accessible via a route that works via any of the catalog domains,
 
 https://api.astrocats.space/
 
