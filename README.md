@@ -44,7 +44,11 @@ There are a few arguments that have special meaning and are only a part of the A
 
 https://api.astrocats.space?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
-By default, queries such as the one above will return the catalog JSON entries for events that satisfy the search conditions. To return data from a specific catalog when searching by a criterion such as position, the user should insert `catalog/` into the URL before the rest of the query of the specific catalog they are interested in, as shown in the example below:
+#### Return all supernova metadata in CSV format
+
+https://api.sne.space/catalog?format=CSV
+
+By default, queries such as the two above will return the catalog entries for events that satisfy the search conditions. To return data from a specific catalog when searching by a criterion such as position, the user should insert `catalog/` into the URL before the rest of the query of the specific catalog they are interested in, as shown in the example below:
 
 #### Redshifts of all supernovae with a redshift reported within 5° of a coordinate, in CSV format
 
