@@ -9,7 +9,7 @@ from timeit import default_timer as timer
 import numpy as np
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request
 from six import string_types
 from werkzeug.contrib.fixers import ProxyFix
 
@@ -51,7 +51,7 @@ def msg(name, reps=[], fmt=None):
     msg_txt = messages.get(
         name, messages.get('no_message', '')).format(
             *listify(reps))
-    return (msg_txt if fmt in dsv_fmts else {'message':msg_txt})
+    return (msg_txt if fmt in dsv_fmts else {'message': msg_txt})
 
 
 def replace_multiple(y, xs, rep):
@@ -62,6 +62,7 @@ def replace_multiple(y, xs, rep):
 
 
 def valf(x):
+    """Return the `value` attribute of a quantity, if it exists."""
     return (x.get('value', '') if isinstance(x, dict) else x)
 
 
@@ -171,7 +172,8 @@ class Catalog(Resource):
         if isinstance(result, Response):
             logger.info('Query successful!')
         elif 'message' in result:
-            logger.info('Query unsuccessful, message: {}'.format(result['message']))
+            logger.info('Query unsuccessful, message: {}'.format(
+                result['message']))
         elif not result:
             logger.info('Query unsuccessful, no results returned.')
         else:
@@ -312,7 +314,7 @@ class Catalog(Resource):
                     return msg('no_objects')
             elif catalog_name in catalogs:
                 ename = '+'.join([i.replace('+', '$PLUS$')
-                    for i in catalogs[catalog_name]])
+                                  for i in catalogs[catalog_name]])
                 search_all = True
             else:
                 return msg('no_root_data')
@@ -320,7 +322,7 @@ class Catalog(Resource):
             if qname is None:
                 qname = '+'.join(catalog_keys[catalog_name])
 
-        #if fmt is not None and qname is None:
+        # if fmt is not None and qname is None:
         #    return Response((
         #        'Error: \'{}\' format only supported if quantity '
         #        'is specified.').format(
@@ -431,8 +433,10 @@ class Catalog(Resource):
                         if closest is not None:
                             closest_locs = list(sorted(list(set([
                                 np.argmin([abs(np.mean([
-                                    float(y) for y in listify(x.get(i))]) - float(
-                                        includes[i])) for x in my_quantity])
+                                    float(y) for y in listify(
+                                        x.get(i))]) - float(
+                                            includes[
+                                                i])) for x in my_quantity])
                                 for i in includes if len(my_quantity) and
                                 is_number(includes[i]) and
                                 all([is_number(x.get(i, ''))
@@ -443,7 +447,6 @@ class Catalog(Resource):
                                 my_quantity) if not len(
                                     closest_locs) or xi in closest_locs]
 
-
                             if item is not None:
                                 try:
                                     qdict[quantity] = qdict[quantity][item]
@@ -451,7 +454,8 @@ class Catalog(Resource):
                                     pass
                         else:
                             qdict[quantity] = self.get_attributes(
-                                attribute_names, my_quantity, complete=complete,
+                                attribute_names, my_quantity,
+                                complete=complete,
                                 full=use_full, item=item,
                                 includes=includes, excludes=excludes,
                                 closest_locs=closest_locs,
@@ -471,7 +475,7 @@ class Catalog(Resource):
 
         event_names = new_event_names
         ename = '+'.join([i.replace('+', '$PLUS$')
-            for i in event_names])
+                          for i in event_names])
 
         if not full and use_full:
             return self.retrieve(
@@ -480,13 +484,14 @@ class Catalog(Resource):
 
         if fmt is not None:
             return self.get_event_dsv(
-                edict, event_names, quantity_names, attribute_names, fmt, sortby)
+                edict, event_names, quantity_names, attribute_names, fmt,
+                sortby)
 
         return edict
 
     def get_attributes(
-        self, anames, quantity, complete=None, full=False, item=None, includes={},
-            excludes={}, closest_locs=[], sources=[]):
+        self, anames, quantity, complete=None, full=False, item=None,
+            includes={}, excludes={}, closest_locs=[], sources=[]):
         """Return array of attributes."""
         if complete is None:
             attributes = [
@@ -512,7 +517,7 @@ class Catalog(Resource):
                  if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and
-                    (not len(closest_locs) or xi in closest_locs) and (
+                (not len(closest_locs) or xi in closest_locs) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
                         includes.get(i).lower() == x.get(i, '').lower())
@@ -529,7 +534,8 @@ class Catalog(Resource):
         return attributes
 
     @api.representation('text/plain')
-    def get_event_dsv(self, edict, enames, qnames, anames, fmt='csv', sortby=None):
+    def get_event_dsv(
+            self, edict, enames, qnames, anames, fmt='csv', sortby=None):
         """Get delimited table."""
         if fmt not in dsv_fmts:
             return msg('unknown_fmt')
@@ -653,7 +659,8 @@ class Catalog(Resource):
                 si = outarr[0].index(sortby)
             except Exception:
                 return msg('cant_sort', reps=[sortby])
-            outarr = [outarr[0]] + list(sorted(outarr[1:], key=lambda x: x[si]))
+            outarr = [outarr[0]] + \
+                list(sorted(outarr[1:], key=lambda x: x[si]))
 
         ret_arr = [
             delim.join([
@@ -710,9 +717,11 @@ for cat in catdict:
         catalog_keys[cat].update(list(catalogs[cat][event].keys()))
         levent = catalogs[cat].get(event, {})
         laliases = levent.get('alias', [])
-        laliases = list(set([event.lower()] + [x['value'].lower() for x in laliases] + [
+        laliases = list(set([event.lower()] + [x['value'].lower() for x in
+                                               laliases] + [
             replace_multiple(x['value'].lower(), ['sn', 'at'], '')
-            for x in laliases if x['value'].lower().startswith(('sn', 'at'))] + [
+            for x in laliases if x['value'].lower().startswith((
+                'sn', 'at'))] + [
             replace_multiple(x['value'].lower(), ['-', '–'], '')
             for x in laliases]))
         for alias in laliases:
