@@ -37,6 +37,7 @@ There are a few arguments that have special meaning and are only a part of the A
 * `radius=r`: Return events within a distance `r` (in arcseconds) of a given set of `ra` and `dec` coordinates. Note that this disables exact matches for `ra` and `dec`.
 * `width=w`: Return events within a distance `w` (in arcseconds) of a given `ra` value (for box searches).
 * `height=h`: Return events within a distance `h` (in arcseconds) of a given `dec` value (for box searches).
+* `sortby=s`: Sort the returned array by the attribute `s` (only works when returning results in `csv`/`tsv` formats).
 
 ## Example queries
 
@@ -82,6 +83,10 @@ https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?format
 #### Only return observations that contain all requested attributes
 
 https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?complete
+
+#### Sort the returned photometry by magnitude
+
+https://api.astrocats.space/SN2014J/photometry/magnitude+e_magnitude+band?format=csv&sortby=magnitude
 
 #### Return observations for multiple events at once, in CSV format
 
