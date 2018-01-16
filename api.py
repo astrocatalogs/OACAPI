@@ -143,7 +143,8 @@ class Catalog(Resource):
         'closest',
         'item',
         'full',
-        'download'
+        'download',
+        'sortby'
     ])
     _ALWAYS_FULL = set([
         'source'
@@ -233,6 +234,7 @@ class Catalog(Resource):
 
         fmt = req_vals.get('format')
         fmt = fmt.lower() if fmt is not None else fmt
+        fmt = None if fmt == 'json' else fmt
 
         ra = req_vals.get('ra')
         dec = req_vals.get('dec')
@@ -242,6 +244,9 @@ class Catalog(Resource):
         complete = req_vals.get('complete')
         first = req_vals.get('first')
         closest = req_vals.get('closest')
+        sortby = req_vals.get('sortby')
+
+        sortby = sortby.lower() if sortby is not None else sortby
 
         include_keys = list(
             sorted(set(request.args.keys()) - self._SPECIAL_ATTR))
@@ -464,7 +469,6 @@ class Catalog(Resource):
             if not (skip_entry and (full or search_all)):
                 new_event_names.append(event)
 
-        logger.info([len(event_names), len(new_event_names)])
         event_names = new_event_names
         ename = '+'.join([i.replace('+', '$PLUS$')
             for i in event_names])
@@ -476,7 +480,7 @@ class Catalog(Resource):
 
         if fmt is not None:
             return self.get_event_dsv(
-                edict, event_names, quantity_names, attribute_names, fmt)
+                edict, event_names, quantity_names, attribute_names, fmt, sortby)
 
         return edict
 
@@ -525,7 +529,7 @@ class Catalog(Resource):
         return attributes
 
     @api.representation('text/plain')
-    def get_event_dsv(self, edict, enames, qnames, anames, fmt='csv'):
+    def get_event_dsv(self, edict, enames, qnames, anames, fmt='csv', sortby=None):
         """Get delimited table."""
         if fmt not in dsv_fmts:
             return msg('unknown_fmt')
@@ -643,11 +647,20 @@ class Catalog(Resource):
             for i, row in enumerate(outarr):
                 outarr[i].insert(0, rowheaders[i])
 
-        ret_str = '\n'.join([
+        # Sort the returned array.
+        if sortby is not None:
+            try:
+                si = outarr[0].index(sortby)
+            except Exception:
+                return msg('cant_sort', reps=[sortby])
+            outarr = [outarr[0]] + list(sorted(outarr[1:], key=lambda x: x[si]))
+
+        ret_arr = [
             delim.join([
                 ('"' + delim.join(z) + '"') if is_list(
                     z) else z for z in y])
-            for y in outarr])
+            for y in outarr]
+        ret_str = '\n'.join(ret_arr)
         return Response(ret_str, mimetype='text/plain')
 
 

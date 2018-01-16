@@ -1,4 +1,5 @@
 {
+    "cant_sort":"Unable to sort by '{}' unless attribute is included in query.",
     "event_not_found":"Event '{}' not found in any catalog.",
     "fmt_unsupported":"{} not supported for this query type.",
     "height_limited":"Height limited to {} degrees.",
