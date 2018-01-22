@@ -21,9 +21,9 @@ The pattern for the API is one of the domains listed above (e.g. `https://api.as
 
 `/EVENT/QUANTITY/ATTRIBUTE?ARGUMENT1=VALUE1&ARGUMENT2=VALUE2&...`
 
-where `EVENT` is set to a transient's name, `QUANTITY` is set to a desired quantity to retrieve (e.g. redshift), `ATTRIBUTE` is a property of that quantity, and the `ARGUMENT` variables allow to user to filter data based upon various attribute values. The `ARGUMENT` variables can either be used to guarantee that a certain attribute appears in the returned results (e.g. adding `&time&e_magnitude` to the query will guarantee that each returned item has a `time` and `e_magnitude` attribute), or used to filter via a simple equality such as `telescope=HST` (which would only return `QUANTITY` objects where the `telescope` attribute equals `"HST"`), or they can be more powerful for certain filter attributes (examples being `ra` and `dec` for doing cone searches).
+where `EVENT` is set to a transient's name, `QUANTITY` is set to a desired quantity to retrieve (e.g. redshift), `ATTRIBUTE` is a property of that quantity, and the `ARGUMENT` variables allow to user to filter data based upon various attribute values. The `ARGUMENT` variables can either be used to guarantee that a certain attribute appears in the returned results (e.g. adding `&time&e_magnitude` to the query will guarantee that each returned item has a `time` and `e_magnitude` attribute), or used to filter via a simple equality such as `telescope=HST` (which would only return `QUANTITY` objects where the `telescope` attribute equals `"HST"`), or they can be more powerful for certain filter attributes (examples being `ra` and `dec` for performing cone searches).
 
-Key names that are usable in API calls can be found in the [OAC schema](https://github.com/astrocatalogs/schema). Below, we provide some example queries that demonstrate the API's capabilites.
+Key names that are usable in API calls can be found in the [OAC schema](https://github.com/astrocatalogs/schema). Below, we provide some example queries that demonstrate the API's capabilities.
 
 ### Special arguments
 
