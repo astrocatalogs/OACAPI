@@ -2,6 +2,7 @@
 
 [![Website](https://img.shields.io/website-up-down-green-red/https/api.astrocats.space.svg?label=status)](https://github.com/astrocatalogs/OACAPI)
 [![Calls](https://img.shields.io/badge/dynamic/json.svg?label=successful%20queries%20in%20last%20week&colorB=ff69b4&prefix=&suffix=&query=$.count&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php)](https://github.com/astrocatalogs/OACAPI)
+[![Uniques](https://img.shields.io/badge/dynamic/json.svg?label=unique%20users%20in%20last%20week&colorB=bc44ee&prefix=&suffix=&query=$.unique&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php)](https://github.com/astrocatalogs/OACAPI)
 
 The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the Open Astronomy Catalogs (e.g. the <a href="https://sne.space">Open Supernova</a>, <a href="https://tde.space">Tidal Disruption</a>, and <a href="https://kilonova.space">Kilonova</a> Catalogs). The API is accessible via a route that works via any of the catalog domains,
 
@@ -21,9 +22,9 @@ The pattern for the API is one of the domains listed above (e.g. `https://api.as
 
 `/EVENT/QUANTITY/ATTRIBUTE?ARGUMENT1=VALUE1&ARGUMENT2=VALUE2&...`
 
-where `EVENT` is set to a transient's name, `QUANTITY` is set to a desired quantity to retrieve (e.g. redshift), `ATTRIBUTE` is a property of that quantity, and the `ARGUMENT` variables allow to user to filter data based upon various attribute values. The `ARGUMENT` variables can either be used to guarantee that a certain attribute appears in the returned results (e.g. adding `&time&e_magnitude` to the query will guarantee that each returned item has a `time` and `e_magnitude` attribute), or used to filter via a simple equality such as `telescope=HST` (which would only return `QUANTITY` objects where the `telescope` attribute equals `"HST"`), or they can be more powerful for certain filter attributes (examples being `ra` and `dec` for doing cone searches).
+where `EVENT` is set to a transient's name, `QUANTITY` is set to a desired quantity to retrieve (e.g. redshift), `ATTRIBUTE` is a property of that quantity, and the `ARGUMENT` variables allow to user to filter data based upon various attribute values. The `ARGUMENT` variables can either be used to guarantee that a certain attribute appears in the returned results (e.g. adding `&time&e_magnitude` to the query will guarantee that each returned item has a `time` and `e_magnitude` attribute), or used to filter via a simple equality such as `telescope=HST` (which would only return `QUANTITY` objects where the `telescope` attribute equals `"HST"`), or they can be more powerful for certain filter attributes (examples being `ra` and `dec` for performing cone searches).
 
-Key names that are usable in API calls can be found in the [OAC schema](https://github.com/astrocatalogs/schema). Below, we provide some example queries that demonstrate the API's capabilites.
+Key names that are usable in API calls can be found in the [OAC schema](https://github.com/astrocatalogs/schema). Below, we provide some example queries that demonstrate the API's capabilities.
 
 ### Special arguments
 
@@ -43,7 +44,7 @@ There are a few arguments that have special meaning and are only a part of the A
 
 #### Return all events within a 2" cone about a set of coordinates
 
-https://api.astrocats.space?ra=21:23:32.16&dec=-53:01:36.08&radius=2
+https://api.astrocats.space/catalog?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
 #### Return all supernova metadata in CSV format
 
