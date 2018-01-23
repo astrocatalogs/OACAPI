@@ -44,7 +44,7 @@ There are a few arguments that have special meaning and are only a part of the A
 
 #### Return all events within a 2" cone about a set of coordinates
 
-https://api.astrocats.space?ra=21:23:32.16&dec=-53:01:36.08&radius=2
+https://api.astrocats.space/catalog?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
 #### Return all supernova metadata in CSV format
 
