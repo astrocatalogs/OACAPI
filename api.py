@@ -320,7 +320,12 @@ class Catalog(Resource):
                 return msg('no_root_data')
 
             if qname is None:
-                qname = '+'.join(catalog_keys[catalog_name])
+                if catalog_name not in catdict:
+                    qname = '+'.join([
+                        a for b in [catalog_keys[x]
+                                    for x in catalog_keys] for a in b])
+                else:
+                    qname = '+'.join(catalog_keys[catalog_name])
 
         # if fmt is not None and qname is None:
         #    return Response((
