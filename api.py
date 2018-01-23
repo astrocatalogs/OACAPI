@@ -54,7 +54,7 @@ def msg(name, reps=[], fmt=None):
     return (msg_txt if fmt in dsv_fmts else {'message': msg_txt})
 
 
-def replace_multiple(y, xs, rep):
+def replace_multiple(y, xs, rep=''):
     """Match multiple strings to replace in sequence."""
     for x in xs:
         y = y.replace(x, rep)
@@ -290,7 +290,18 @@ class Catalog(Resource):
 
         if ename and ename.lower() == 'catalog':
             if ra is not None and dec is not None:
-                lcoo = coord(ra, dec, unit=(un.hourangle, un.deg))
+                try:
+                    ldec = dec.lower().strip(' .')
+                    if is_number(ldec) or decregex.match(ldec):
+                        lra = ra.lower().replace('h', '').strip(' .')
+                        if raregex.match(lra) or (is_number(lra) and 'h' in ra):
+                            lcoo = coord(lra, ldec, unit=(un.hourangle, un.deg))
+                        elif is_number(lra):
+                            lcoo = coord(lra, ldec, unit=(un.deg, un.deg))
+                        else:
+                            raise Exception
+                except Exception:
+                    return msg('bad_coordinates')
                 if (width is not None and height is not None and
                         width > 0.0 and height > 0.0):
                     idxcat = np.where((abs(
@@ -729,10 +740,10 @@ for cat in catdict:
         laliases = levent.get('alias', [])
         laliases = list(set([event.lower()] + [x['value'].lower() for x in
                                                laliases] + [
-            replace_multiple(x['value'].lower(), ['sn', 'at'], '')
+            replace_multiple(x['value'].lower(), ['sn', 'at'])
             for x in laliases if x['value'].lower().startswith((
                 'sn', 'at'))] + [
-            replace_multiple(x['value'].lower(), ['-', '–'], '')
+            replace_multiple(x['value'].lower(), ['-', '–'])
             for x in laliases]))
         for alias in laliases:
             aliases.setdefault(alias.lower().replace(' ', ''),
