@@ -162,8 +162,13 @@ class Catalog(Resource):
         logger.info('Query from {}: {} -- {}/{}/{}'.format(
             request.remote_addr, catalog_name, event_name, quantity_name,
             attribute_name))
-        logger.info('Arguments: ' + ', '.join(['='.join(x)
-                                               for x in request.args.items()]))
+
+        req_vals = request.get_json()
+
+        if not req_vals:
+            req_vals = request.values
+
+        logger.info('Arguments: ' + json.dumps(req_vals))
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
@@ -179,7 +184,6 @@ class Catalog(Resource):
         else:
             logger.info('Query successful!')
 
-        req_vals = request.get_json()
         if req_vals and 'download' in req_vals:
             ext = req_vals.get('format')
             ext = '.' + ext.lower() if ext is not None else '.json'
@@ -291,10 +295,11 @@ class Catalog(Resource):
         if ename and ename.lower() == 'catalog':
             if ra is not None and dec is not None:
                 try:
-                    ldec = dec.lower().strip(' .')
+                    ldec = str(dec).lower().strip(' .')
                     if is_number(ldec) or decregex.match(ldec):
-                        lra = ra.lower().replace('h', '').strip(' .')
-                        if raregex.match(lra) or (is_number(lra) and 'h' in ra):
+                        sra = str(ra)
+                        lra = sra.lower().replace('h', '').strip(' .')
+                        if raregex.match(lra) or (is_number(lra) and 'h' in sra):
                             lcoo = coord(lra, ldec, unit=(un.hourangle, un.deg))
                         elif is_number(lra):
                             lcoo = coord(lra, ldec, unit=(un.deg, un.deg))
@@ -554,7 +559,6 @@ class Catalog(Resource):
 
         return attributes
 
-    @api.representation('text/plain')
     def get_event_dsv(
             self, edict, enames, qnames, anames, fmt='csv', sortby=None):
         """Get delimited table."""
