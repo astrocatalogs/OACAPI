@@ -329,7 +329,8 @@ class Catalog(Resource):
                         a for b in [catalog_keys[x]
                                     for x in catalog_keys] for a in b]))))
                 else:
-                    qname = '+'.join(list(set(sorted(catalog_keys[catalog_name]))))
+                    qname = '+'.join(
+                        list(set(sorted(catalog_keys[catalog_name]))))
 
         # if fmt is not None and qname is None:
         #    return Response((
