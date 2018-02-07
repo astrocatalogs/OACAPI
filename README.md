@@ -60,7 +60,7 @@ If the user instead wishes to return info on all events across all catalogs, the
 
 #### Redshifts of all events with a redshift reported within 5° of a coordinate, in CSV format
 
-https://api.astrocats.space/all/redshift?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv&redshift
+https://api.astrocats.space/catalog/redshift?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv&redshift
 
 Individual event queries can return more-detailed information about each event, including datafiles such as spectra. Below, we show some examples of this in action:
 
@@ -111,18 +111,18 @@ Note that the above returns an empty result. Instead, we want to do:
 
 #### Luminosity distances and claimed types of all events with an available luminosity distance and "Ia" listed as a type, in TSV format
 
-https://api.astrocats.space/all/lumdist+claimedtype?lumdist&claimedtype=ia&format=tsv
+https://api.astrocats.space/catalog/lumdist+claimedtype?lumdist&claimedtype=ia&format=tsv
 
 #### Return the spectrum closest to the listed MJD
 
 https://api.astrocats.space/SN2014J/spectra/time+data?time=56703.2&closest
 
-The `all/` route (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
+The `catalog/` route (combined with filtering) can also return data from the individual event files if data isn't contained within the main OAC catalog files (i.e. the data that is visible on the main pages of the Open Supernova Catalog, etc.). Because these queries are expensive (the full dataset must be loaded for each event), they have some numeric limits to prevent overloading the server.
 
 #### Return all photometry in a 2" radius about a coordinate, in CSV format
 
-https://api.astrocats.space/all/photometry/time+band+magnitude?ra=21:23:32.16&dec=-53:01:36.08&radius=2&format=csv
+https://api.astrocats.space/catalog/photometry/time+band+magnitude?ra=21:23:32.16&dec=-53:01:36.08&radius=2&format=csv
 
 #### Return the instruments used to produce spectra within a 5° of a given coordinate, in CSV format
 
-https://api.astrocats.space/all/spectra/instrument?ra=21:23:32.16&dec=-53:01:36.08&radius=18000&format=csv
+https://api.astrocats.space/catalog/spectra/instrument?ra=21:23:32.16&dec=-53:01:36.08&radius=18000&format=csv
