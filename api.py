@@ -66,6 +66,13 @@ def valf(x):
     return (x.get('value', '') if isinstance(x, dict) else x)
 
 
+def commify(x):
+    """Convert list of strings into a comma-delimited list."""
+    lx = listify(x)
+    lx = ('"' + ",".join(lx) + '"') if len(lx) > 1 else x
+    return lx
+
+
 def is_number(s):
     """Check if input is a number."""
     if isinstance(s, list) and not isinstance(s, string_types):
@@ -145,7 +152,13 @@ class Catalog(Resource):
         'item',
         'full',
         'download',
-        'sortby'
+        'sortby',
+        'event',
+        'quantity',
+        'attribute'
+    ])
+    _CASE_SENSITIVE_ATTR = set([
+        'band'
     ])
     _ALWAYS_FULL = set([
         'source'
@@ -255,7 +268,7 @@ class Catalog(Resource):
         sortby = sortby.lower() if sortby is not None else sortby
 
         include_keys = list(
-            sorted(set(request.args.keys()) - self._SPECIAL_ATTR))
+            sorted(set(req_vals.keys()) - self._SPECIAL_ATTR))
         includes = OrderedDict()
         for key in include_keys:
             includes[key] = req_vals.get(key)
@@ -335,18 +348,19 @@ class Catalog(Resource):
             else:
                 return msg('no_root_data')
 
-            if qname is None:
-                # Short circuit to full if keyword is present.
-                if full:
-                    return self.retrieve(
-                        catalog_name, event_name=ename, full=True)
-                if catalog_name not in catdict:
-                    qname = '+'.join(list(set(sorted([
-                        a for b in [catalog_keys[x]
-                                    for x in catalog_keys] for a in b]))))
-                else:
-                    qname = '+'.join(
-                        list(set(sorted(catalog_keys[catalog_name]))))
+        if qname is None:
+            # Short circuit to full if keyword is present.
+            if full:
+                return self.retrieve(
+                    catalog_name, event_name=ename, full=True)
+            search_all = True
+            if catalog_name not in catdict:
+                qname = '+'.join(list(set(sorted([
+                    a for b in [catalog_keys[x]
+                                for x in catalog_keys] for a in b]))))
+            else:
+                qname = '+'.join(
+                    list(sorted(set(catalog_keys[catalog_name]))))
 
         # if fmt is not None and qname is None:
         #    return Response((
@@ -531,10 +545,12 @@ class Catalog(Resource):
                         self._ALWAYS_FULL.intersection(anames)]) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
-                        includes.get(i).lower() == x.get(i, '').lower())
+                        (includes.get(i) == commify(x.get(i, '')))
+                        if i in self._CASE_SENSITIVE_ATTR else
+                        (includes.get(i).lower() == commify(x.get(i, '')).lower()))
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
-                    excludes.get(e) == x.get(e)) for e in excludes])]
+                    excludes.get(e) == commify(x.get(e))) for e in excludes])]
         else:
             attributes = [
                 ([','.join(sources[[int(y) - 1 for y in x.get(
@@ -546,10 +562,12 @@ class Catalog(Resource):
                 (not len(closest_locs) or xi in closest_locs) and (
                     (len(closest_locs) and xi in closest_locs) or
                     all([(i in x) if (includes.get(i) == '') else (
-                        includes.get(i).lower() == x.get(i, '').lower())
+                        (includes.get(i) == commify(x.get(i, '')))
+                        if i in self._CASE_SENSITIVE_ATTR else
+                        (includes.get(i).lower() == commify(x.get(i, '')).lower()))
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
-                    excludes.get(e) == x.get(e)) for e in excludes])]
+                    excludes.get(e) == commify(x.get(e))) for e in excludes])]
 
         if item is not None:
             try:
@@ -579,13 +597,18 @@ class Catalog(Resource):
             if len(attr) != 1 or len(attr[0]) != 1:
                 return msg('one_spectra')
             data_str = ''
-            for row in attr[0][0]:
+            for ri, row in enumerate(attr[0][0]):
+                if ri == 0:
+                    data_str += ','.join(['wavelength','flux'])
+                    if len(row) > 2:
+                        data_str += ',e_flux'
+                    data_str += '\n'
                 data_str += ','.join(row) + '\n'
-            return data_str
+            return Response(data_str, mimetype='text/plain')
 
         delim = ',' if fmt == 'csv' else '\t'
 
-        if len(enames) > 1:
+        if len(enames) > 0:
             rax = 'e'
             if not len(anames) and len(qnames):
                 cax = 'a'
@@ -653,9 +676,7 @@ class Catalog(Resource):
                             list, zip(*edict[ename][x])))]
                     for x in edict[ename]]
             else:
-                outarr = [edict[ename][x] if len(
-                    edict[ename][x]) == 1 else [
-                    delim.join(edict[ename][x])]
+                outarr = [[delim.join([valf(y) for y in edict[ename][x]])]
                     for x in edict[ename]]
         elif rax == 'a':
             outarr = edict[ename][qname]
