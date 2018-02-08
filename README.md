@@ -14,7 +14,7 @@ https://api.tde.space/
 
 https://api.kilonova.space/
 
-where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will use the api.astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided.
+where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will (usually) use the api.astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided.
 
 ## General use
 
@@ -41,6 +41,10 @@ There are a few arguments that have special meaning and are only a part of the A
 * `sortby=s`: Sort the returned array by the attribute `s` (only works when returning results in `csv`/`tsv` formats).
 
 ## Example queries
+
+#### Return basic information about the API service (and a link back to this README)
+
+https://api.astrocats.space/
 
 #### Return all events within a 2" cone about a set of coordinates
 
