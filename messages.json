@@ -5,6 +5,7 @@
     "fmt_unsupported":"{} not supported for this query type.",
     "height_limited":"Height limited to {} degrees.",
     "max_events":"Maximum event limit ({}) exceeded.",
+    "no_catalog_route":"The astrocats.space domain does not support 'catalog/' routes. Please use one of the specific catalog routes instead (e.g. api.sne.space for supernovae, api.tde.space for tidal disruptions, etc.).",
     "no_delimited":"This query does not support delimited output.",
     "no_objects":"No objects found within specified search region.",
     "no_root_data":"Welcome to the API of the Open Astronomy Catalogs! Please see https://github.com/astrocatalogs/OACAPI for API examples.",

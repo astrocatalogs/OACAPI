@@ -242,6 +242,9 @@ class Catalog(Resource):
             else:
                 aname = attribute_req
 
+        if ename is None:
+            return msg('no_root_data')
+
         # Options
         if not use_full:
             rfull = req_vals.get('full')
@@ -305,7 +308,7 @@ class Catalog(Resource):
             if height >= self._ANGLE_LIMIT:
                 return msg('height_limited', self._ANGLE_LIMIT / 3600.)
 
-        if ename and ename.lower() == 'catalog':
+        if ename and ename.lower() in ['catalog', 'all']:
             if ra is not None and dec is not None:
                 try:
                     ldec = str(dec).lower().strip(' .')
@@ -337,16 +340,23 @@ class Catalog(Resource):
                     idxcat = np.where(lcoo.separation(coo) <=
                                       radius * un.arcsecond)[0]
                 if len(idxcat):
-                    ename = '+'.join([rdnames[i].replace('+', '$PLUS$')
+                    ename_arr = '+'.join([rdnames[i].replace('+', '$PLUS$')
                                       for i in idxcat])
                 else:
                     return msg('no_objects')
             elif catalog_name in catalogs:
-                ename = '+'.join([i.replace('+', '$PLUS$')
-                                  for i in catalogs[catalog_name]])
-                search_all = True
+                ename_arr = [i.replace('+', '$PLUS$')
+                             for i in catalogs[catalog_name]]
             else:
-                return msg('no_root_data')
+                ename_arr = [
+                    a for b in [
+                        [i.replace('+', '$PLUS$')
+                         for i in catalogs[cat]] for cat in catalogs
+                    ] for a in b
+                ]
+                search_all = True
+
+            ename = '+'.join(list(sorted(set(ename_arr))))
 
         if qname is None:
             # Short circuit to full if keyword is present.
@@ -727,10 +737,6 @@ api.add_resource(
     Catalog,
     '/'.join(['', cn]),
     '/'.join(['', cn]) + '/',
-    '/'.join(['', cn, 'all', qn]),
-    '/'.join(['', cn, 'all', qn]) + '/',
-    '/'.join(['', cn, 'all', qn, an]),
-    '/'.join(['', cn, 'all', qn, an]) + '/',
     '/'.join(['', cn, 'event', en]),
     '/'.join(['', cn, 'event', en]) + '/',
     '/'.join(['', cn, 'event', en, qn]),
