@@ -340,8 +340,8 @@ class Catalog(Resource):
                     idxcat = np.where(lcoo.separation(coo) <=
                                       radius * un.arcsecond)[0]
                 if len(idxcat):
-                    ename_arr = '+'.join([rdnames[i].replace('+', '$PLUS$')
-                                      for i in idxcat])
+                    ename_arr = [rdnames[i].replace('+', '$PLUS$')
+                                 for i in idxcat]
                 else:
                     return msg('no_objects')
             elif catalog_name in catalogs:
