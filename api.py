@@ -172,9 +172,9 @@ class Catalog(Resource):
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
         """Get result."""
-        logger.info('Query from {}: {} -- {}/{}/{}'.format(
+        logger.info('Query from {}: {} -- {}/{}/{} -- User Agent: {}'.format(
             request.remote_addr, catalog_name, event_name, quantity_name,
-            attribute_name))
+            attribute_name, request.headers.get('User-Agent', '?')))
 
         req_vals = request.get_json()
 
