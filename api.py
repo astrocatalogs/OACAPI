@@ -24,7 +24,8 @@ api = Api(app)
 catdict = OrderedDict((
     ('sne', 'supernovae'),
     ('tde', 'tidaldisruptions'),
-    ('kilonova', 'kilonovae')
+    ('kilonova', 'kilonovae'),
+    ('faststars', 'faststars')
 ))
 
 catalogs = OrderedDict()
