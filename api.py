@@ -274,8 +274,10 @@ class Catalog(Resource):
         include_keys = list(
             sorted(set(req_vals.keys()) - self._SPECIAL_ATTR))
         includes = OrderedDict()
+        iincludes = OrderedDict()
         for key in include_keys:
-            includes[key] = req_vals.get(key)
+            includes[key] = re.compile(req_vals.get(key))
+            iincludes[key] = re.compile(req_vals.get(key), re.IGNORECASE)
 
         excludes = OrderedDict([('realization', '')])
 
@@ -469,11 +471,15 @@ class Catalog(Resource):
                 if aname is None:
                     for incl in includes:
                         incll = incl.lower()
+                        logger.info(iincludes[incl].pattern)
+                        if incll in my_event_dict:
+                            logger.info([bool(iincludes[incl].match(x.get(
+                                'value', '') if isinstance(x, dict) else x))
+                                for x in my_event_dict.get(incll, [{}])])
                         if incll not in my_event_dict or (
-                            includes[incl] != '' and not any([(x.get(
-                                'value', '') if isinstance(x, dict)
-                                else x).lower() == includes[incl].lower()
-                                for x in my_event_dict[incll]])):
+                            iincludes[incl].pattern != '' and not any([bool(iincludes[incl].match(x.get(
+                                'value', '') if isinstance(x, dict) else x))
+                                for x in my_event_dict.get(incll, [{}])])):
                             skip_entry = True
                             break
 
@@ -487,9 +493,9 @@ class Catalog(Resource):
                                     float(y) for y in listify(
                                         x.get(i))]) - float(
                                             includes[
-                                                i])) for x in my_quantity])
+                                                i].pattern)) for x in my_quantity])
                                 for i in includes if len(my_quantity) and
-                                is_number(includes[i]) and
+                                is_number(includes[i].pattern) and
                                 all([is_number(x.get(i, ''))
                                      for x in my_quantity])]))))
 
@@ -555,10 +561,10 @@ class Catalog(Resource):
                     [x.get(a) is not None for a in
                         self._ALWAYS_FULL.intersection(anames)]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([(i in x) if (includes.get(i) == '') else (
-                        (includes.get(i) == commify(x.get(i, '')))
+                    all([(i in x) if (includes.get(i, re.compile('')).pattern == '') else (
+                        includes.get(i, re.compile('')).match(commify(x.get(i, '')))
                         if i in self._CASE_SENSITIVE_ATTR else
-                        (includes.get(i).lower() == commify(x.get(i, '')).lower()))
+                        iincludes.get(i, re.compile('')).match(commify(x.get(i, ''))))
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == commify(x.get(e))) for e in excludes])]
@@ -572,10 +578,10 @@ class Catalog(Resource):
                     [x.get(a) is not None for a in anames]) and
                 (not len(closest_locs) or xi in closest_locs) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([(i in x) if (includes.get(i) == '') else (
-                        (includes.get(i) == commify(x.get(i, '')))
+                    all([(i in x) if (includes.get(i, re.compile('').pattern) == '') else (
+                        includes.get(i, re.compile('')).match(commify(x.get(i, '')))
                         if i in self._CASE_SENSITIVE_ATTR else
-                        (includes.get(i).lower() == commify(x.get(i, '')).lower()))
+                        iincludes.get(i, re.compile('')).match(commify(x.get(i, ''))))
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == commify(x.get(e))) for e in excludes])]
