@@ -177,7 +177,8 @@ class Catalog(Resource):
     def get(self, catalog_name, event_name=None, quantity_name=None,
             attribute_name=None):
         """Get result."""
-        logger.info('Query from {}: {} -- {}/{}/{} -- User Agent: {}'.format(
+        loglines = []
+        loglines.append('Query from {}: {} -- {}/{}/{} -- User Agent: {}'.format(
             request.remote_addr, catalog_name, event_name, quantity_name,
             attribute_name, request.headers.get('User-Agent', '?')))
 
@@ -186,21 +187,24 @@ class Catalog(Resource):
         if not req_vals:
             req_vals = request.values
 
-        logger.info('Arguments: ' + json.dumps(req_vals))
+        loglines.append('Arguments: ' + json.dumps(req_vals))
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
         end = timer()
-        logger.info('Time to perform query: {}s'.format(end - start))
+        loglines.append('Time to perform query: {}s'.format(end - start))
         if isinstance(result, Response):
-            logger.info('Query successful!')
+            loglines.append('Query successful!')
         elif 'message' in result:
-            logger.info('Query unsuccessful, message: {}'.format(
+            loglines.append('Query unsuccessful, message: {}'.format(
                 result['message']))
         elif not result:
-            logger.info('Query unsuccessful, no results returned.')
+            loglines.append('Query unsuccessful, no results returned.')
         else:
-            logger.info('Query successful!')
+            loglines.append('Query successful!')
+
+        for line in loglines:
+            logger.info(line)
 
         if req_vals and 'download' in req_vals:
             ext = req_vals.get('format')
@@ -281,7 +285,7 @@ class Catalog(Resource):
         iincludes = OrderedDict()
         for key in include_keys:
             val = req_vals.get(key, '')
-            if not is_number(val):
+            if not is_number(val) and val != '':
                 val = '^' + val + '$'
             try:
                 includes[key] = re.compile(val)
@@ -360,6 +364,7 @@ class Catalog(Resource):
             elif catalog_name in catalogs:
                 ename_arr = [i.replace('+', '$PLUS$')
                              for i in catalogs[catalog_name]]
+                search_all = True
             else:
                 ename_arr = [
                     a for b in [
@@ -481,7 +486,7 @@ class Catalog(Resource):
                         my_event, {})
 
                 if aname is None:
-                    for incl in includes:
+                    for incl in iincludes:
                         incll = incl.lower()
                         if incll not in my_event_dict or (
                             iincludes[incl].pattern != '' and not any([bool(iincludes[incl].match(x.get(
@@ -521,7 +526,7 @@ class Catalog(Resource):
                                 attribute_names, my_quantity,
                                 complete=complete,
                                 full=use_full, item=item,
-                                includes=includes, excludes=excludes,
+                                includes=includes, iincludes=iincludes, excludes=excludes,
                                 closest_locs=closest_locs,
                                 sources=np.array(sources.get(my_event, [])))
 
@@ -555,7 +560,7 @@ class Catalog(Resource):
 
     def get_attributes(
         self, anames, quantity, complete=None, full=False, item=None,
-            includes={}, excludes={}, closest_locs=[], sources=[]):
+            includes={}, iincludes={}, excludes={}, closest_locs=[], sources=[]):
         """Return array of attributes."""
         if complete is None:
             attributes = [
@@ -568,10 +573,10 @@ class Catalog(Resource):
                     [x.get(a) is not None for a in
                         self._ALWAYS_FULL.intersection(anames)]) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([(i in x) if (includes.get(i, re.compile('')).pattern == '') else (
-                        includes.get(i, re.compile('')).match(commify(x.get(i, '')))
-                        if i in self._CASE_SENSITIVE_ATTR else
-                        iincludes.get(i, re.compile('')).match(commify(x.get(i, ''))))
+                    all([((i in x) if (includes[i].pattern == '') else (
+                         includes[i].match(commify(x.get(i, '')))
+                         if i in self._CASE_SENSITIVE_ATTR else
+                         iincludes[i].match(commify(x.get(i, '')))))
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == commify(x.get(e))) for e in excludes])]
@@ -585,10 +590,10 @@ class Catalog(Resource):
                     [x.get(a) is not None for a in anames]) and
                 (not len(closest_locs) or xi in closest_locs) and (
                     (len(closest_locs) and xi in closest_locs) or
-                    all([(i in x) if (includes.get(i, re.compile('').pattern) == '') else (
-                        includes.get(i, re.compile('')).match(commify(x.get(i, '')))
-                        if i in self._CASE_SENSITIVE_ATTR else
-                        iincludes.get(i, re.compile('')).match(commify(x.get(i, ''))))
+                    all([((i in x) if (includes[i].pattern == '') else (
+                         includes[i].match(commify(x.get(i, '')))
+                         if i in self._CASE_SENSITIVE_ATTR else
+                         iincludes[i].match(commify(x.get(i, '')))))
                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == commify(x.get(e))) for e in excludes])]
@@ -700,8 +705,8 @@ class Catalog(Resource):
                             list, zip(*edict[ename][x])))]
                     for x in edict[ename]]
             else:
-                outarr = [[delim.join([valf(y) for y in edict[ename][x]])]
-                    for x in edict[ename]]
+                outarr = [[delim.join([valf(y) for y in edict.get(ename, {}).get(x) if y is not None])]
+                    for x in edict.get(ename, {})]
         elif rax == 'a':
             outarr = edict[ename][qname]
         else:
@@ -809,6 +814,7 @@ for cat in catdict:
 
 all_events = list(sorted(set(all_events), key=lambda s: (s.upper(), s)))
 coo = coord(ras, decs, unit=(un.hourangle, un.deg))
+del(ras, decs)
 
 logger.info('Launching API...')
 # app.run()
