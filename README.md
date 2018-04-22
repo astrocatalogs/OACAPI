@@ -123,6 +123,14 @@ Note that the above returns an empty result. Instead, we want to do:
 
 https://api.astrocats.space/catalog/lumdist+claimedtype?lumdist&claimedtype=ia&format=tsv
 
+Regular expressions are also supported in the `ATTRIBUTE` fields, allowing users to perform more sophisticated matches to attribute values:
+
+#### Claimed types of all objects with a typing that has a prefix matching "Ia-", in TSV format
+
+https://api.astrocats.space/catalog/claimedtype?claimedtype=Ia-(.*)&format=tsv
+
+Note that many regular expression symbols must be URL-encoded to be passed properly to the API.
+
 #### Return the spectrum closest to the listed MJD
 
 https://api.astrocats.space/SN2014J/spectra/time+data?time=56703.2&closest
