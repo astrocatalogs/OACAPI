@@ -276,8 +276,11 @@ class Catalog(Resource):
         includes = OrderedDict()
         iincludes = OrderedDict()
         for key in include_keys:
-            includes[key] = re.compile(req_vals.get(key))
-            iincludes[key] = re.compile(req_vals.get(key), re.IGNORECASE)
+            val = req_vals.get(key)
+            if not is_number(val):
+                val = '^' + val + '$'
+            includes[key] = re.compile(val)
+            iincludes[key] = re.compile(val, re.IGNORECASE)
 
         excludes = OrderedDict([('realization', '')])
 
@@ -471,11 +474,6 @@ class Catalog(Resource):
                 if aname is None:
                     for incl in includes:
                         incll = incl.lower()
-                        logger.info(iincludes[incl].pattern)
-                        if incll in my_event_dict:
-                            logger.info([bool(iincludes[incl].match(x.get(
-                                'value', '') if isinstance(x, dict) else x))
-                                for x in my_event_dict.get(incll, [{}])])
                         if incll not in my_event_dict or (
                             iincludes[incl].pattern != '' and not any([bool(iincludes[incl].match(x.get(
                                 'value', '') if isinstance(x, dict) else x))
@@ -698,7 +696,7 @@ class Catalog(Resource):
         elif rax == 'a':
             outarr = edict[ename][qname]
         else:
-            outarr = listify(edict[ename][qname])
+            outarr = listify(edict.get(ename, {}).get(qname, {}))
 
         boolrows = [any([isinstance(x, bool) for x in y])
                     for y in list(map(list, zip(*outarr)))]
