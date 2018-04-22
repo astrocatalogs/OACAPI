@@ -123,7 +123,7 @@ Note that the above returns an empty result. Instead, we want to do:
 
 https://api.astrocats.space/catalog/lumdist+claimedtype?lumdist&claimedtype=ia&format=tsv
 
-Regular expressions are also supported in the `ATTRIBUTE` fields, allowing users to perform more sophisticated matches to attribute values:
+Regular expressions are also supported in the `ARGUMENT` fields, allowing users to perform more sophisticated matches to attribute values:
 
 #### Claimed types of all objects with a typing that has a prefix matching "Ia-", in TSV format
 
