@@ -22,10 +22,14 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-    ('sne', 'supernovae'),
-    ('tde', 'tidaldisruptions'),
-    ('kilonova', 'kilonovae'),
-    ('faststars', 'faststars')
+    ('sne', ['supernovae', 'catalog.min.json']),
+    ('tde', ['tidaldisruptions', 'catalog.min.json']),
+    ('kilonova', ['kilonovae', 'catalog.min.json']),
+    ('faststars', ['faststars', 'catalog.min.json']),
+    ('sne-graveyard', ['supernovae', 'bones.min.json']),
+    ('tde-graveyard', ['tidaldisruptions', 'bones.min.json']),
+    ('kilonova-graveyard', ['kilonovae', 'bones.min.json']),
+    ('faststars-graveyard', ['faststars', 'bones.min.json'])
 ))
 
 catalogs = OrderedDict()
@@ -276,11 +280,14 @@ class Catalog(Resource):
         includes = OrderedDict()
         iincludes = OrderedDict()
         for key in include_keys:
-            val = req_vals.get(key)
+            val = req_vals.get(key, '')
             if not is_number(val):
                 val = '^' + val + '$'
-            includes[key] = re.compile(val)
-            iincludes[key] = re.compile(val, re.IGNORECASE)
+            try:
+                includes[key] = re.compile(val)
+                iincludes[key] = re.compile(val, re.IGNORECASE)
+            except Exception:
+                return msg('invalid_regex', [req_vals.get(key, ''), key])
 
         excludes = OrderedDict([('realization', '')])
 
@@ -445,11 +452,13 @@ class Catalog(Resource):
                     if opt[0] != catalog_name:
                         my_cat, my_event, my_alias = tuple(opt)
             if not my_cat:
-                return msg('event_not_found', event)
+                if len(event_names) == 1:
+                    return msg('event_not_found', event)
+                continue
             if full:
                 fcatalogs.update(json.load(
                     open(os.path.join(
-                        ac_path, catdict[my_cat], 'output', 'json',
+                        ac_path, catdict[my_cat][0], 'output', 'json',
                         get_filename(my_event)), 'r'),
                     object_pairs_hook=OrderedDict))
                 sources[my_event] = [
@@ -758,7 +767,7 @@ api.add_resource(
 logger.info('Loading catalog...')
 for cat in catdict:
     catalogs[cat] = json.load(open(os.path.join(
-        ac_path, catdict[cat], 'output', 'catalog.min.json'), 'r'),
+        ac_path, catdict[cat][0], 'output', catdict[cat][1]), 'r'),
         object_pairs_hook=OrderedDict)
     catalogs[cat] = OrderedDict(sorted(dict(
         zip([x['name'] for x in catalogs[cat]], catalogs[cat])).items(),
