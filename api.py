@@ -452,10 +452,12 @@ class Catalog(Resource):
             for opt in alopts:
                 if opt[0] == catalog_name:
                     my_cat, my_event, my_alias = tuple(opt)
+                    break
             if not my_cat:
                 for opt in alopts:
                     if opt[0] != catalog_name:
                         my_cat, my_event, my_alias = tuple(opt)
+                        break
             if not my_cat:
                 if len(event_names) == 1:
                     return msg('event_not_found', event)
@@ -534,12 +536,15 @@ class Catalog(Resource):
                             use_full = True
                             break
                 if not full and use_full:
-                    new_event_names = event_names
+                    new_event_names = list(event_names)
                     break
                 if qdict:
                     edict[event] = qdict
 
-            if not (skip_entry and (full or search_all)):
+            if not full and use_full:
+                break
+
+            if not (skip_entry and (full or search_all)) and event in edict:
                 new_event_names.append(event)
 
         event_names = new_event_names
@@ -672,6 +677,8 @@ class Catalog(Resource):
 
         if rax and cax:
             rowheaders.insert(0, self._AXSUB[rax])
+
+        #logger.info(list(zip(*(enames, list(edict.keys())))))
 
         outarr = [[]]
         if rax == 'e':
