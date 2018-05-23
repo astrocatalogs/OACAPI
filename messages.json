@@ -1,4 +1,6 @@
 {
+    "atel_no_attribute":"None of the requested attributes could be found in these telegram(s).",
+    "atels_reloaded":"Astronomer's telegrams reloaded",
     "bad_coordinates":"Provided coordinates are not valid, must be in either decimal degrees or sexigesimal (HH:MM:SSS for R.A., DD:MM:SS for declination) format.",
     "cant_sort":"Unable to sort by '{}' unless attribute is included in query.",
     "event_not_found":"Event '{}' not found in any catalog.",

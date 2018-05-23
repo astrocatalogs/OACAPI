@@ -1,4 +1,5 @@
 """API for the Open Astronomy Catalogs."""
+import gzip
 import json
 import logging
 import os
@@ -78,6 +79,21 @@ def commify(x):
     return lx
 
 
+def is_integer(s):
+    if isinstance(s, list) and not isinstance(s, basestring):
+        try:
+            [int(x) for x in s]
+            return True
+        except ValueError:
+            return False
+    else:
+        try:
+            int(s)
+            return True
+        except ValueError:
+            return False
+
+
 def is_number(s):
     """Check if input is a number."""
     if isinstance(s, list) and not isinstance(s, string_types):
@@ -119,6 +135,14 @@ def get_filename(name):
 def bool_str(x):
     """Return T or F for a bool."""
     return 'T' if x else 'F'
+
+
+def load_atels():
+    global atels, atel_txts
+    # Load astronomer's telegrams.
+    with gzip.open(os.path.join('/root', 'better-atel', 'atels.json.gz'), 'rb') as f:
+        atels = json.loads(f.read().decode('utf-8'))
+    atel_txts = [(x.get('title', '') + ': ' + x.get('body', '')).lower() for x in atels]
 
 
 class Catalogs(Resource):
@@ -188,6 +212,13 @@ class Catalog(Resource):
             req_vals = request.values
 
         loglines.append('Arguments: ' + json.dumps(req_vals))
+
+        if event_name == 'reload_atels':
+            load_atels()
+            for line in loglines:
+                logger.info(line)
+            return msg('atels_reloaded')
+
         start = timer()
         result = self.retrieve(catalog_name, event_name,
                                quantity_name, attribute_name, False)
@@ -217,6 +248,48 @@ class Catalog(Resource):
         return result
 
     def retrieve(self, catalog_name, event_name=None, quantity_name=None,
+                 attribute_name=None, full=False):
+        if event_name is not None and event_name.lower() in ['atel', 'telegram']:
+            return self.retrieve_atel(quantity_name, attribute_name)
+        return self.retrieve_objects(catalog_name, event_name,
+            quantity_name, attribute_name, full)
+
+    def retrieve_atel(self, query_string=None, attribute_name=None):
+        """Retrieve astronomer's telegram(s) given query."""
+
+        atel_ret = []
+        if is_integer(query_string):
+            atel_ret = [atels[int(query_string) - 1]]
+        elif query_string is not None:
+            qsls = [query_string.strip().lower()]
+            for a in aliases:
+                if qsls[0] in aliases[a]:
+                    qsls = [x for x in aliases[a] if len(x) > 3]
+                    break
+            # Assume string is/are event name(s), find atels with those events.
+            for ai, atxt in enumerate(atel_txts):
+                found = False
+                for qsl in qsls:
+                    if qsl in atxt or qsl.replace(' ', '') in atxt:
+                        atel_ret.append(atels[ai])
+                        break
+
+        if atel_ret:
+            if attribute_name is not None:
+                atel_orig = atel_ret
+                atel_ret = []
+                for ari, ar in enumerate(atel_orig):
+                    atel_ret.append(OrderedDict())
+                    anames = [x.strip() for x in attribute_name.lower().split('+')]
+                    for aname in anames:
+                        atel_ret[ari][aname] = atel_orig[ari].get(aname)
+                    if all([atel_ret[ari][x] is None for x in atel_ret[ari]]):
+                        return msg('atel_no_attribute')
+            return atel_ret
+
+        return
+
+    def retrieve_objects(self, catalog_name, event_name=None, quantity_name=None,
                  attribute_name=None, full=False):
         """Retrieve data, first trying catalog file then event files."""
         event = None
@@ -258,7 +331,7 @@ class Catalog(Resource):
         if not use_full:
             rfull = req_vals.get('full')
             if rfull is not None:
-                return self.retrieve(
+                return self.retrieve_objects(
                     catalog_name, event_name=ename,
                     quantity_name=qname, attribute_name=aname,
                     full=True)
@@ -379,7 +452,7 @@ class Catalog(Resource):
         if qname is None:
             # Short circuit to full if keyword is present.
             if full:
-                return self.retrieve(
+                return self.retrieve_objects(
                     catalog_name, event_name=ename, full=True)
             search_all = True
             if catalog_name not in catdict:
@@ -552,7 +625,7 @@ class Catalog(Resource):
                           for i in event_names])
 
         if not full and use_full:
-            return self.retrieve(
+            return self.retrieve_objects(
                 catalog_name, event_name=ename, quantity_name=qname,
                 attribute_name=aname, full=True)
 
@@ -788,6 +861,10 @@ logger.info('Creating alias dictionary and position arrays...')
 ras = []
 decs = []
 all_events = []
+
+load_atels()
+
+# Load object catalogs.
 for cat in catdict:
     catalog_keys[cat] = set()
     for event in catalogs[cat]:
