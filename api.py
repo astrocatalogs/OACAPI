@@ -142,7 +142,8 @@ def load_atels():
     # Load astronomer's telegrams.
     with gzip.open(os.path.join('/root', 'better-atel', 'atels.json.gz'), 'rb') as f:
         atels = json.loads(f.read().decode('utf-8'))
-    atel_txts = [(x.get('title', '') + ': ' + x.get('body', '')).lower() for x in atels]
+    atel_txts = [(x.get('title', '') + ': ' + x.get('body', '') + ' [' +
+        ', '.join(x.get('authors', '')) + ']').lower() for x in atels]
 
 
 class Catalogs(Resource):
@@ -287,7 +288,7 @@ class Catalog(Resource):
                         return msg('atel_no_attribute')
             return atel_ret
 
-        return
+        return msg('no_atels_found')
 
     def retrieve_objects(self, catalog_name, event_name=None, quantity_name=None,
                  attribute_name=None, full=False):
@@ -854,6 +855,9 @@ for cat in catdict:
     catalogs[cat] = json.load(open(os.path.join(
         ac_path, catdict[cat][0], 'output', catdict[cat][1]), 'r'),
         object_pairs_hook=OrderedDict)
+    # Add some API-specific fields to each catalog.
+    for i, x in enumerate(catalogs[cat]):
+        catalogs[cat][i]['catalog'] = cat
     catalogs[cat] = OrderedDict(sorted(dict(
         zip([x['name'] for x in catalogs[cat]], catalogs[cat])).items(),
         key=lambda s: (s[0].upper(), s[0])))
