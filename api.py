@@ -145,6 +145,38 @@ def load_atels():
     atel_txts = [(x.get('title', '') + ': ' + x.get('body', '') + ' [' +
         ', '.join(x.get('authors', '')) + ']').lower() for x in atels]
 
+def handle_tns(event):
+    pass
+
+def handle_event(event):
+    global all_events, aliases, ras, decs, rdnames
+    all_events.append(event)
+    catalog_keys[cat].update(list(catalogs[cat][event].keys()))
+    levent = catalogs[cat].get(event, {})
+    laliases = levent.get('alias', [])
+    laliases = list(set([event.lower()] + [x['value'].lower() for x in
+                                           laliases] + [
+        replace_multiple(x['value'].lower(), ['sn', 'at'])
+        for x in laliases if x['value'].lower().startswith((
+            'sn', 'at'))] + [
+        replace_multiple(x['value'].lower(), ['-', '–'])
+        for x in laliases]))
+    for alias in laliases:
+        aliases.setdefault(alias.lower().replace(' ', ''),
+                           []).append([cat, event, alias])
+    lra = levent.get('ra')
+    ldec = levent.get('dec')
+    if lra is None and ldec is None:
+        continue
+    lra = lra[0].get('value')
+    ldec = ldec[0].get('value')
+    if lra is None or ldec is None:
+        continue
+    if not raregex.match(lra) or not decregex.match(ldec):
+        continue
+    rdnames.append(event)
+    ras.append(lra)
+    decs.append(ldec)
 
 class Catalogs(Resource):
     """Return all catalogs."""
@@ -219,6 +251,10 @@ class Catalog(Resource):
             for line in loglines:
                 logger.info(line)
             return msg('atels_reloaded')
+
+        if event_name == 'new_tns':
+            loglines.append(json.dumps(req_vals.get('body', {})))
+            return msg('new_tns')
 
         start = timer()
         result = self.retrieve(catalog_name, event_name,
@@ -412,6 +448,8 @@ class Catalog(Resource):
                             lcoo = coord(lra, ldec, unit=(un.deg, un.deg))
                         else:
                             raise Exception
+                    else:
+                        raise Exception
                 except Exception:
                     return msg('bad_coordinates')
                 if (width is not None and height is not None and
@@ -872,33 +910,7 @@ load_atels()
 for cat in catdict:
     catalog_keys[cat] = set()
     for event in catalogs[cat]:
-        all_events.append(event)
-        catalog_keys[cat].update(list(catalogs[cat][event].keys()))
-        levent = catalogs[cat].get(event, {})
-        laliases = levent.get('alias', [])
-        laliases = list(set([event.lower()] + [x['value'].lower() for x in
-                                               laliases] + [
-            replace_multiple(x['value'].lower(), ['sn', 'at'])
-            for x in laliases if x['value'].lower().startswith((
-                'sn', 'at'))] + [
-            replace_multiple(x['value'].lower(), ['-', '–'])
-            for x in laliases]))
-        for alias in laliases:
-            aliases.setdefault(alias.lower().replace(' ', ''),
-                               []).append([cat, event, alias])
-        lra = levent.get('ra')
-        ldec = levent.get('dec')
-        if lra is None and ldec is None:
-            continue
-        lra = lra[0].get('value')
-        ldec = ldec[0].get('value')
-        if lra is None or ldec is None:
-            continue
-        if not raregex.match(lra) or not decregex.match(ldec):
-            continue
-        rdnames.append(event)
-        ras.append(lra)
-        decs.append(ldec)
+        handle_event(event)
 
 all_events = list(sorted(set(all_events), key=lambda s: (s.upper(), s)))
 coo = coord(ras, decs, unit=(un.hourangle, un.deg))
