@@ -8,6 +8,7 @@ from collections import OrderedDict
 from timeit import default_timer as timer
 
 import numpy as np
+from astrocats.catalog.utils import is_integer, is_number, sortOD
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
 from flask import Flask, Response, request
@@ -23,19 +24,21 @@ Compress(app)
 api = Api(app)
 
 catdict = OrderedDict((
-    ('sne', ['supernovae', 'catalog.min.json']),
-    ('tde', ['tidaldisruptions', 'catalog.min.json']),
-    ('kilonova', ['kilonovae', 'catalog.min.json']),
-    ('faststars', ['faststars', 'catalog.min.json']),
-    ('sne-graveyard', ['supernovae', 'bones.min.json']),
-    ('tde-graveyard', ['tidaldisruptions', 'bones.min.json']),
-    ('kilonova-graveyard', ['kilonovae', 'bones.min.json']),
-    ('faststars-graveyard', ['faststars', 'bones.min.json'])
+    ('sne', ['supernovae', 'catalog.min.json', 'sne-2015-2019']),
+    ('tde', ['tidaldisruptions', 'catalog.min.json', 'tde-2015-2019']),
+    ('kilonova', ['kilonovae', 'catalog.min.json', 'kne-2000-2029']),
+    ('faststars', ['faststars', 'catalog.min.json', 'faststars-output']),
+    ('sne-graveyard', ['supernovae', 'bones.min.json', 'sne-boneyard']),
+    ('tde-graveyard', ['tidaldisruptions', 'bones.min.json', 'tde-boneyard']),
+    ('kilonova-graveyard', ['kilonovae', 'bones.min.json', 'kne-boneyard']),
+    ('faststars-graveyard', [
+        'faststars', 'bones.min.json', 'faststars-boneyard'])
 ))
 
 catalogs = OrderedDict()
 catalog_keys = OrderedDict()
 aliases = OrderedDict()
+all_aliases = set()
 coo = None
 rdnames = []
 
@@ -79,40 +82,41 @@ def commify(x):
     return lx
 
 
-def is_integer(s):
-    if isinstance(s, list) and not isinstance(s, basestring):
-        try:
-            [int(x) for x in s]
-            return True
-        except ValueError:
-            return False
-    else:
-        try:
-            int(s)
-            return True
-        except ValueError:
-            return False
+def entabbed_json_dumps(string, **kwargs):
+    """Produce entabbed string for JSON output.
+
+    This is necessary because Python 2 does not allow tabs to be used in its
+    JSON dump(s) functions.
+    """
+    import sys
+
+    if sys.version_info[:2] >= (3, 3):
+        return json.dumps(
+            string,
+            indent='\t',
+            separators=kwargs['separators'],
+            ensure_ascii=False)
+        return
+    newstr = unicode(json.dumps(  # noqa: F821
+        string,
+        indent=4,
+        separators=kwargs['separators'],
+        ensure_ascii=False,
+        encoding='utf8'))
+    newstr = re.sub(
+        '\n +',
+        lambda match: '\n' + '\t' * (len(match.group().strip('\n')) / 4),
+        newstr)
+    return newstr
 
 
-def is_number(s):
-    """Check if input is a number."""
-    if isinstance(s, list) and not isinstance(s, string_types):
-        try:
-            for x in s:
-                if isinstance(x, string_types) and ' ' in x:
-                    raise ValueError
-            [float(x) for x in s]
-            return True
-        except ValueError:
-            return False
-    else:
-        try:
-            if isinstance(s, string_types) and ' ' in s:
-                raise ValueError
-            float(s)
-            return True
-        except ValueError:
-            return False
+def entabbed_json_dump(dic, f, **kwargs):
+    """Write `entabbed_json_dumps` output to file handle."""
+    string = entabbed_json_dumps(dic, **kwargs)
+    try:
+        f.write(string)
+    except UnicodeEncodeError:
+        f.write(string.encode('ascii', 'replace').decode())
 
 
 def is_list(x):
@@ -138,18 +142,86 @@ def bool_str(x):
 
 
 def load_atels():
+    """Reload the ATel dictionaries."""
     global atels, atel_txts
     # Load astronomer's telegrams.
-    with gzip.open(os.path.join('/root', 'better-atel', 'atels.json.gz'), 'rb') as f:
+    with gzip.open(os.path.join(
+            '/root', 'better-atel', 'atels.json.gz'), 'rb') as f:
         atels = json.loads(f.read().decode('utf-8'))
     atel_txts = [(x.get('title', '') + ': ' + x.get('body', '') + ' [' +
-        ', '.join(x.get('authors', '')) + ']').lower() for x in atels]
+                  ', '.join(x.get('authors', '')) + ']').lower()
+                 for x in atels]
+
 
 def handle_tns(event):
-    pass
+    """Add a newly announced TNS event."""
+    global all_aliases
+    from astrocats.catalog.entry import ENTRY, Entry
+    import time
+    import urllib
 
-def handle_event(event):
-    global all_events, aliases, ras, decs, rdnames
+    global tnskey
+
+    # First, create the JSON file.
+    name = 'AT' + event
+
+    cat = 'sne'
+
+    # Check if already in catalog, if so skip.
+    if name.lower() in all_aliases:
+        return
+
+    new_event = Entry(name=name)
+
+    data = urllib.parse.urlencode({
+        'api_key': tnskey,
+        'data': json.dumps({
+            'objname': name,
+            'photometry': '1'
+        })
+    }).encode('ascii')
+    req = urllib.request.Request(
+        'https://wis-tns.weizmann.ac.il/api/get/object', data=data)
+    trys = 0
+    objdict = None
+    while trys < 3 and not objdict:
+        try:
+            objdict = json.loads(urllib.request.urlopen(
+                req, timeout=30).read().decode('ascii'))[
+                    'data']['reply']
+        except KeyboardInterrupt:
+            raise
+        except Exception:
+            logger.info('API request failed for `{}`.'.format(name))
+            time.sleep(5)
+        trys = trys + 1
+    if (not objdict or 'objname' not in objdict or
+            not isinstance(objdict['objname'], str)):
+        logger.info('Object `{}` not found!'.format(name))
+        return
+    objdict = sortOD(objdict)
+
+    logger.info(objdict)
+
+    new_event.add_quantity(ENTRY.RA, objdict['ra'])
+    new_event.add_quantity(ENTRY.DEC, objdict['dec'])
+
+    oentry = new_event._ordered(new_event)
+
+    outfile = os.path.join(
+        ac_path, catdict[cat][0], 'output', catdict[cat][2], name + '.json')
+    if not os.path.exists(outfile):
+        entabbed_json_dump(
+            {name: oentry}, open(outfile, 'w'),
+            separators=(',', ':'))
+
+    # Then, load it into the API dicts.
+    add_event(cat, name)
+
+
+def add_event(cat, event):
+    """Add event to global arrays."""
+    global all_events, catalog_keys, aliases, ras, decs, rdnames
     all_events.append(event)
     catalog_keys[cat].update(list(catalogs[cat][event].keys()))
     levent = catalogs[cat].get(event, {})
@@ -164,19 +236,21 @@ def handle_event(event):
     for alias in laliases:
         aliases.setdefault(alias.lower().replace(' ', ''),
                            []).append([cat, event, alias])
+        all_aliases.add(alias)
     lra = levent.get('ra')
     ldec = levent.get('dec')
     if lra is None and ldec is None:
-        continue
+        return
     lra = lra[0].get('value')
     ldec = ldec[0].get('value')
     if lra is None or ldec is None:
-        continue
+        return
     if not raregex.match(lra) or not decregex.match(ldec):
-        continue
+        return
     rdnames.append(event)
     ras.append(lra)
     decs.append(ldec)
+
 
 class Catalogs(Resource):
     """Return all catalogs."""
@@ -235,9 +309,10 @@ class Catalog(Resource):
             attribute_name=None):
         """Get result."""
         loglines = []
-        loglines.append('Query from {}: {} -- {}/{}/{} -- User Agent: {}'.format(
-            request.remote_addr, catalog_name, event_name, quantity_name,
-            attribute_name, request.headers.get('User-Agent', '?')))
+        loglines.append(
+            'Query from {}: {} -- {}/{}/{} -- User Agent: {}'.format(
+                request.remote_addr, catalog_name, event_name, quantity_name,
+                attribute_name, request.headers.get('User-Agent', '?')))
 
         req_vals = request.get_json()
 
@@ -253,7 +328,7 @@ class Catalog(Resource):
             return msg('atels_reloaded')
 
         if event_name == 'new_tns':
-            loglines.append(json.dumps(req_vals.get('body', {})))
+            handle_tns(quantity_name)
             return msg('new_tns')
 
         start = timer()
@@ -286,14 +361,15 @@ class Catalog(Resource):
 
     def retrieve(self, catalog_name, event_name=None, quantity_name=None,
                  attribute_name=None, full=False):
-        if event_name is not None and event_name.lower() in ['atel', 'telegram']:
+        """Retrieve requested resource."""
+        if event_name is not None and event_name.lower() in [
+                'atel', 'telegram']:
             return self.retrieve_atel(quantity_name, attribute_name)
         return self.retrieve_objects(catalog_name, event_name,
-            quantity_name, attribute_name, full)
+                                     quantity_name, attribute_name, full)
 
     def retrieve_atel(self, query_string=None, attribute_name=None):
         """Retrieve astronomer's telegram(s) given query."""
-
         atel_ret = []
         if is_integer(query_string):
             atel_ret = [atels[int(query_string) - 1]]
@@ -305,7 +381,6 @@ class Catalog(Resource):
                     break
             # Assume string is/are event name(s), find atels with those events.
             for ai, atxt in enumerate(atel_txts):
-                found = False
                 for qsl in qsls:
                     if qsl in atxt or qsl.replace(' ', '') in atxt:
                         atel_ret.append(atels[ai])
@@ -317,7 +392,8 @@ class Catalog(Resource):
                 atel_ret = []
                 for ari, ar in enumerate(atel_orig):
                     atel_ret.append(OrderedDict())
-                    anames = [x.strip() for x in attribute_name.lower().split('+')]
+                    anames = [x.strip()
+                              for x in attribute_name.lower().split('+')]
                     for aname in anames:
                         atel_ret[ari][aname] = atel_orig[ari].get(aname)
                     if all([atel_ret[ari][x] is None for x in atel_ret[ari]]):
@@ -326,8 +402,9 @@ class Catalog(Resource):
 
         return msg('no_atels_found')
 
-    def retrieve_objects(self, catalog_name, event_name=None, quantity_name=None,
-                 attribute_name=None, full=False):
+    def retrieve_objects(
+        self, catalog_name, event_name=None, quantity_name=None,
+            attribute_name=None, full=False):
         """Retrieve data, first trying catalog file then event files."""
         event = None
         use_full = full
@@ -442,8 +519,10 @@ class Catalog(Resource):
                     if is_number(ldec) or decregex.match(ldec):
                         sra = str(ra)
                         lra = sra.lower().replace('h', '').strip(' .')
-                        if raregex.match(lra) or (is_number(lra) and 'h' in sra):
-                            lcoo = coord(lra, ldec, unit=(un.hourangle, un.deg))
+                        if raregex.match(lra) or (
+                                is_number(lra) and 'h' in sra):
+                            lcoo = coord(lra, ldec, unit=(
+                                un.hourangle, un.deg))
                         elif is_number(lra):
                             lcoo = coord(lra, ldec, unit=(un.deg, un.deg))
                         else:
@@ -603,7 +682,8 @@ class Catalog(Resource):
                     for incl in iincludes:
                         incll = incl.lower()
                         if incll not in my_event_dict or (
-                            iincludes[incl].pattern != '' and not any([bool(iincludes[incl].match(x.get(
+                            iincludes[incl].pattern != '' and not any(
+                                [bool(iincludes[incl].match(x.get(
                                 'value', '') if isinstance(x, dict) else x))
                                 for x in my_event_dict.get(incll, [{}])])):
                             skip_entry = True
@@ -614,12 +694,10 @@ class Catalog(Resource):
                         my_quantity = listify(my_event_dict.get(quantity, {}))
                         closest_locs = []
                         if closest is not None:
-                            closest_locs = list(sorted(list(set([
-                                np.argmin([abs(np.mean([
-                                    float(y) for y in listify(
-                                        x.get(i))]) - float(
-                                            includes[
-                                                i].pattern)) for x in my_quantity])
+                            closest_locs = list(sorted(list(set([np.argmin([
+                                abs(np.mean([float(y) for y in listify(
+                                    x.get(i))]) - float(includes[
+                                        i].pattern)) for x in my_quantity])
                                 for i in includes if len(my_quantity) and
                                 is_number(includes[i].pattern) and
                                 all([is_number(x.get(i, ''))
@@ -640,7 +718,8 @@ class Catalog(Resource):
                                 attribute_names, my_quantity,
                                 complete=complete,
                                 full=use_full, item=item,
-                                includes=includes, iincludes=iincludes, excludes=excludes,
+                                includes=includes, iincludes=iincludes,
+                                excludes=excludes,
                                 closest_locs=closest_locs,
                                 sources=np.array(sources.get(my_event, [])))
 
@@ -677,7 +756,8 @@ class Catalog(Resource):
 
     def get_attributes(
         self, anames, quantity, complete=None, full=False, item=None,
-            includes={}, iincludes={}, excludes={}, closest_locs=[], sources=[]):
+            includes={}, iincludes={}, excludes={}, closest_locs=[],
+            sources=[]):
         """Return array of attributes."""
         if complete is None:
             attributes = [
@@ -694,7 +774,7 @@ class Catalog(Resource):
                          includes[i].match(commify(x.get(i, '')))
                          if i in self._CASE_SENSITIVE_ATTR else
                          iincludes[i].match(commify(x.get(i, '')))))
-                        for i in includes])) and
+                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == commify(x.get(e))) for e in excludes])]
         else:
@@ -711,7 +791,7 @@ class Catalog(Resource):
                          includes[i].match(commify(x.get(i, '')))
                          if i in self._CASE_SENSITIVE_ATTR else
                          iincludes[i].match(commify(x.get(i, '')))))
-                        for i in includes])) and
+                         for i in includes])) and
                 not any([(e in x) if (excludes.get(e) == '') else (
                     excludes.get(e) == commify(x.get(e))) for e in excludes])]
 
@@ -745,7 +825,7 @@ class Catalog(Resource):
             data_str = ''
             for ri, row in enumerate(attr[0][0]):
                 if ri == 0:
-                    data_str += ','.join(['wavelength','flux'])
+                    data_str += ','.join(['wavelength', 'flux'])
                     if len(row) > 2:
                         data_str += ',e_flux'
                     data_str += '\n'
@@ -790,7 +870,7 @@ class Catalog(Resource):
         if rax and cax:
             rowheaders.insert(0, self._AXSUB[rax])
 
-        #logger.info(list(zip(*(enames, list(edict.keys())))))
+        # logger.info(list(zip(*(enames, list(edict.keys())))))
 
         outarr = [[]]
         if rax == 'e':
@@ -824,8 +904,9 @@ class Catalog(Resource):
                             list, zip(*edict[ename][x])))]
                     for x in edict[ename]]
             else:
-                outarr = [[delim.join([valf(y) for y in edict.get(ename, {}).get(x) if y is not None])]
-                    for x in edict.get(ename, {})]
+                outarr = [[delim.join([valf(y) for y in edict.get(
+                    ename, {}).get(
+                        x) if y is not None])] for x in edict.get(ename, {})]
         elif rax == 'a':
             outarr = edict[ename][qname]
         else:
@@ -889,6 +970,11 @@ api.add_resource(
     '/'.join(['', cn, en, qn, an]) + '/')
 
 logger.info('Loading catalog...')
+
+# Load TNS API key.
+with open('tns.key', 'r') as f:
+    tnskey = f.read().splitlines()[0]
+
 for cat in catdict:
     catalogs[cat] = json.load(open(os.path.join(
         ac_path, catdict[cat][0], 'output', catdict[cat][1]), 'r'),
@@ -910,7 +996,7 @@ load_atels()
 for cat in catdict:
     catalog_keys[cat] = set()
     for event in catalogs[cat]:
-        handle_event(event)
+        add_event(cat, event)
 
 all_events = list(sorted(set(all_events), key=lambda s: (s.upper(), s)))
 coo = coord(ras, decs, unit=(un.hourangle, un.deg))

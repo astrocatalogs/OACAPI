@@ -102,3 +102,4 @@ ENV/
 
 # other
 *.tags*
+tns.key
