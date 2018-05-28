@@ -41,6 +41,7 @@ aliases = OrderedDict()
 all_aliases = set()
 coo = None
 rdnames = []
+extra_events = {}
 
 ac_path = os.path.join('/root', 'astrocats', 'astrocats')
 
@@ -143,7 +144,7 @@ def bool_str(x):
 
 def load_cats():
     """Reload the catalog dictionaries."""
-    global ras, decs, catdict, catalogs, all_events, catalog_keys, coo
+    global ras, decs, catdict, catalogs, all_events, catalog_keys, coo, extra_events
 
     logger.info('Loading catalog...')
     for cat in catdict:
@@ -156,6 +157,8 @@ def load_cats():
         catalogs[cat] = OrderedDict(sorted(dict(
             zip([x['name'] for x in catalogs[cat]], catalogs[cat])).items(),
             key=lambda s: (s[0].upper(), s[0])))
+        if cat not in extra_events:
+            extra_events[cat] = OrderedDict()
 
     logger.info('Creating alias dictionary and position arrays...')
     ras = []
@@ -172,6 +175,13 @@ def load_cats():
     coo = coord(ras, decs, unit=(un.hourangle, un.deg))
     del(ras, decs)
 
+    # Re-append events that were added later.
+    for cat in extra_events:
+        for event in extra_events[cat]:
+            if event not in catalogs[cat]:
+                catalogs[cat][event] = extra_events[cat][event]
+            add_event(cat, event)
+
 def load_atels():
     """Reload the ATel dictionaries."""
     global atels, atel_txts
@@ -186,7 +196,7 @@ def load_atels():
 
 def handle_tns(event):
     """Add a newly announced TNS event."""
-    global all_aliases, catalogs, tnskey
+    global all_aliases, catalogs, tnskey, extra_events
     from astrocats.catalog.entry import ENTRY, Entry
     import time
     import urllib
@@ -249,7 +259,10 @@ def handle_tns(event):
         new_event.add_quantity(ENTRY.DEC, objdict['dec'], source=source)
     if objdict.get('redshift'):
         new_event.add_quantity(ENTRY.REDSHIFT, objdict['redshift'], source=source)
+    if objdict.get('internal_name'):
+        new_event.add_quantity(ENTRY.ALIAS, objdict['internal_name'], source=source)
 
+    new_event.sanitize()
     oentry = new_event._ordered(new_event)
 
     outfile = os.path.join(
@@ -262,8 +275,10 @@ def handle_tns(event):
     # Then, load it into the API dicts.
     if name not in catalogs[cat]:
         catalogs[cat][name] = oentry
+        extra_events[cat][name] = oentry
 
     add_event(cat, name)
+
     return True
 
 
@@ -274,12 +289,14 @@ def add_event(cat, event, convert_coords=True):
     catalog_keys[cat].update(list(catalogs[cat][event].keys()))
     levent = catalogs[cat].get(event, {})
     laliases = levent.get('alias', [])
-    laliases = list(set([event.lower()] + [x['value'].lower() for x in
-                                           laliases] + [
-        replace_multiple(x['value'].lower(), ['sn', 'at'])
-        for x in laliases if x['value'].lower().startswith((
-            'sn', 'at'))] + [
-        replace_multiple(x['value'].lower(), ['-', '–'])
+    lev = event.lower()
+    laliases = list(set([lev,
+        replace_multiple(lev, ['sn', 'at']) if lev.startswith(('sn', 'at')) else lev] + [
+            x['value'].lower() for x in laliases] + [
+                replace_multiple(x['value'].lower(), ['sn', 'at'])
+                for x in laliases if x['value'].lower().startswith((
+                'sn', 'at'))
+            ] + [replace_multiple(x['value'].lower(), ['-', '–'])
         for x in laliases]))
     for alias in laliases:
         aliases.setdefault(alias.lower().replace(' ', ''),
