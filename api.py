@@ -10,7 +10,7 @@ from timeit import default_timer as timer
 import numpy as np
 from astrocats.catalog.utils import is_integer, is_number, sortOD
 from astropy import units as un
-from astropy.coordinates import SkyCoord as coord
+from astropy.coordinates import SkyCoord as coord, concatenate as coord_concat
 from flask import Flask, Response, request
 from six import string_types
 from werkzeug.contrib.fixers import ProxyFix
@@ -141,6 +141,37 @@ def bool_str(x):
     return 'T' if x else 'F'
 
 
+def load_cats():
+    """Reload the catalog dictionaries."""
+    global ras, decs, catdict, catalogs, all_events, catalog_keys, coo
+
+    logger.info('Loading catalog...')
+    for cat in catdict:
+        catalogs[cat] = json.load(open(os.path.join(
+            ac_path, catdict[cat][0], 'output', catdict[cat][1]), 'r'),
+            object_pairs_hook=OrderedDict)
+        # Add some API-specific fields to each catalog.
+        for i, x in enumerate(catalogs[cat]):
+            catalogs[cat][i]['catalog'] = cat
+        catalogs[cat] = OrderedDict(sorted(dict(
+            zip([x['name'] for x in catalogs[cat]], catalogs[cat])).items(),
+            key=lambda s: (s[0].upper(), s[0])))
+
+    logger.info('Creating alias dictionary and position arrays...')
+    ras = []
+    decs = []
+    all_events = []
+
+    # Load object catalogs.
+    for cat in catdict:
+        catalog_keys[cat] = set()
+        for event in catalogs[cat]:
+            add_event(cat, event, convert_coords=False)
+
+    all_events = list(sorted(set(all_events), key=lambda s: (s.upper(), s)))
+    coo = coord(ras, decs, unit=(un.hourangle, un.deg))
+    del(ras, decs)
+
 def load_atels():
     """Reload the ATel dictionaries."""
     global atels, atel_txts
@@ -155,28 +186,36 @@ def load_atels():
 
 def handle_tns(event):
     """Add a newly announced TNS event."""
-    global all_aliases
+    global all_aliases, catalogs, tnskey
     from astrocats.catalog.entry import ENTRY, Entry
     import time
     import urllib
 
-    global tnskey
-
+    tns_name = 'Transient Name Server'
+    tns_url = 'https://wis-tns.weizmann.ac.il/'
     # First, create the JSON file.
-    name = 'AT' + event
+
+    if event.startswith(('AT', 'SN', 'at', 'sn')):
+        name = event.upper()
+    else:
+        name = 'AT' + event
+
+    qname = replace_multiple(name.lower(), ['at', 'sn'])
 
     cat = 'sne'
 
     # Check if already in catalog, if so skip.
     if name.lower() in all_aliases:
-        return
+        return False
 
     new_event = Entry(name=name)
+
+    source = new_event.add_source(name=tns_name, url=tns_url)
 
     data = urllib.parse.urlencode({
         'api_key': tnskey,
         'data': json.dumps({
-            'objname': name,
+            'objname': qname,
             'photometry': '1'
         })
     }).encode('ascii')
@@ -195,16 +234,21 @@ def handle_tns(event):
             logger.info('API request failed for `{}`.'.format(name))
             time.sleep(5)
         trys = trys + 1
-    if (not objdict or 'objname' not in objdict or
-            not isinstance(objdict['objname'], str)):
-        logger.info('Object `{}` not found!'.format(name))
-        return
-    objdict = sortOD(objdict)
 
     logger.info(objdict)
 
-    new_event.add_quantity(ENTRY.RA, objdict['ra'])
-    new_event.add_quantity(ENTRY.DEC, objdict['dec'])
+    if (not objdict or 'objname' not in objdict or
+            not isinstance(objdict['objname'], str)):
+        logger.info('Object `{}` not found!'.format(name))
+        return False
+    objdict = sortOD(objdict)
+
+    if objdict.get('ra'):
+        new_event.add_quantity(ENTRY.RA, objdict['ra'], source=source)
+    if objdict.get('dec'):
+        new_event.add_quantity(ENTRY.DEC, objdict['dec'], source=source)
+    if objdict.get('redshift'):
+        new_event.add_quantity(ENTRY.REDSHIFT, objdict['redshift'], source=source)
 
     oentry = new_event._ordered(new_event)
 
@@ -216,12 +260,16 @@ def handle_tns(event):
             separators=(',', ':'))
 
     # Then, load it into the API dicts.
+    if name not in catalogs[cat]:
+        catalogs[cat][name] = oentry
+
     add_event(cat, name)
+    return True
 
 
-def add_event(cat, event):
+def add_event(cat, event, convert_coords=True):
     """Add event to global arrays."""
-    global all_events, catalog_keys, aliases, ras, decs, rdnames
+    global all_events, catalog_keys, aliases, ras, decs, rdnames, coo
     all_events.append(event)
     catalog_keys[cat].update(list(catalogs[cat][event].keys()))
     levent = catalogs[cat].get(event, {})
@@ -248,8 +296,11 @@ def add_event(cat, event):
     if not raregex.match(lra) or not decregex.match(ldec):
         return
     rdnames.append(event)
-    ras.append(lra)
-    decs.append(ldec)
+    if convert_coords:
+        coo = coord_concat((coo, coord(lra, ldec, unit=(un.hourangle, un.deg))))
+    else:
+        ras.append(lra)
+        decs.append(ldec)
 
 
 class Catalogs(Resource):
@@ -321,6 +372,12 @@ class Catalog(Resource):
 
         loglines.append('Arguments: ' + json.dumps(req_vals))
 
+        if event_name == 'reload_cats':
+            load_cats()
+            for line in loglines:
+                logger.info(line)
+            return msg('cats_reloaded')
+
         if event_name == 'reload_atels':
             load_atels()
             for line in loglines:
@@ -328,8 +385,8 @@ class Catalog(Resource):
             return msg('atels_reloaded')
 
         if event_name == 'new_tns':
-            handle_tns(quantity_name)
-            return msg('new_tns')
+            result = handle_tns(quantity_name)
+            return msg('new_tns' if result else 'failed_tns', quantity_name)
 
         start = timer()
         result = self.retrieve(catalog_name, event_name,
@@ -969,38 +1026,13 @@ api.add_resource(
     '/'.join(['', cn, en, qn, an]),
     '/'.join(['', cn, en, qn, an]) + '/')
 
-logger.info('Loading catalog...')
-
 # Load TNS API key.
 with open('tns.key', 'r') as f:
     tnskey = f.read().splitlines()[0]
 
-for cat in catdict:
-    catalogs[cat] = json.load(open(os.path.join(
-        ac_path, catdict[cat][0], 'output', catdict[cat][1]), 'r'),
-        object_pairs_hook=OrderedDict)
-    # Add some API-specific fields to each catalog.
-    for i, x in enumerate(catalogs[cat]):
-        catalogs[cat][i]['catalog'] = cat
-    catalogs[cat] = OrderedDict(sorted(dict(
-        zip([x['name'] for x in catalogs[cat]], catalogs[cat])).items(),
-        key=lambda s: (s[0].upper(), s[0])))
-logger.info('Creating alias dictionary and position arrays...')
-ras = []
-decs = []
-all_events = []
+load_cats()
 
 load_atels()
-
-# Load object catalogs.
-for cat in catdict:
-    catalog_keys[cat] = set()
-    for event in catalogs[cat]:
-        add_event(cat, event)
-
-all_events = list(sorted(set(all_events), key=lambda s: (s.upper(), s)))
-coo = coord(ras, decs, unit=(un.hourangle, un.deg))
-del(ras, decs)
 
 logger.info('Launching API...')
 # app.run()
