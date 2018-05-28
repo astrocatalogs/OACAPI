@@ -167,13 +167,13 @@ def handle_event(event):
     lra = levent.get('ra')
     ldec = levent.get('dec')
     if lra is None and ldec is None:
-        continue
+        return
     lra = lra[0].get('value')
     ldec = ldec[0].get('value')
     if lra is None or ldec is None:
-        continue
+        return
     if not raregex.match(lra) or not decregex.match(ldec):
-        continue
+        return
     rdnames.append(event)
     ras.append(lra)
     decs.append(ldec)
