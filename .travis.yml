@@ -7,7 +7,9 @@ addons:
     packages:
       - ca-certificates
 
-install: "pip install Flask"
+install:
+  - conda install --yes astrocats astropy flask numpy six
+  - pip install flask_compress flask_restful
 
 script:
   - echo "Unit tests"
