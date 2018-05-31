@@ -10,11 +10,13 @@ from timeit import default_timer as timer
 import numpy as np
 from astrocats.catalog.utils import is_integer, is_number, sortOD
 from astropy import units as un
-from astropy.coordinates import SkyCoord as coord, concatenate as coord_concat
+from astropy.coordinates import SkyCoord as coord
+from astropy.coordinates import concatenate as coord_concat
 from flask import Flask, Response, request
 from six import string_types
 from werkzeug.contrib.fixers import ProxyFix
 
+from classes.apidata import ApiData
 from flask_compress import Compress
 from flask_restful import Api, Resource
 
@@ -22,27 +24,7 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app)
 Compress(app)
 api = Api(app)
-
-catdict = OrderedDict((
-    ('sne', ['supernovae', 'catalog.min.json', 'sne-2015-2019']),
-    ('tde', ['tidaldisruptions', 'catalog.min.json', 'tde-2015-2019']),
-    ('kilonova', ['kilonovae', 'catalog.min.json', 'kne-2000-2029']),
-    ('faststars', ['faststars', 'catalog.min.json', 'faststars-output']),
-    ('sne-graveyard', ['supernovae', 'bones.min.json', 'sne-boneyard']),
-    ('tde-graveyard', ['tidaldisruptions', 'bones.min.json', 'tde-boneyard']),
-    ('kilonova-graveyard', ['kilonovae', 'bones.min.json', 'kne-boneyard']),
-    ('faststars-graveyard', [
-        'faststars', 'bones.min.json', 'faststars-boneyard'])
-))
-
-catalogs = OrderedDict()
-catalog_keys = OrderedDict()
-aliases = OrderedDict()
-all_aliases = set()
-coo = None
-extra_events = {}
-
-ac_path = os.path.join('/root', 'astrocats', 'astrocats')
+apidata = ApiData()
 
 raregex = re.compile("^[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
 decregex = re.compile("^[+-]?[0-9]{1,2}:[0-9]{2}(:?[0-9]{2}\.?([0-9]+)?)?$")
@@ -143,61 +125,62 @@ def bool_str(x):
 
 def load_cats():
     """Reload the catalog dictionaries."""
-    global ras, decs, catdict, catalogs, all_events, catalog_keys, coo, extra_events, rdnames
-
-
     logger.info('Loading catalog...')
-    for cat in catdict:
-        catalogs[cat] = json.load(open(os.path.join(
-            ac_path, catdict[cat][0], 'output', catdict[cat][1]), 'r'),
+    for cat in apidata._CATS:
+        apidata._catalogs[cat] = json.load(open(os.path.join(
+            apidata._AC_PATH, apidata._CATS[cat][0], 'output',
+            apidata._CATS[cat][1]), 'r'),
             object_pairs_hook=OrderedDict)
         # Add some API-specific fields to each catalog.
-        for i, x in enumerate(catalogs[cat]):
-            catalogs[cat][i]['catalog'] = cat
-        catalogs[cat] = OrderedDict(sorted(dict(
-            zip([x['name'] for x in catalogs[cat]], catalogs[cat])).items(),
+        for i, x in enumerate(apidata._catalogs[cat]):
+            apidata._catalogs[cat][i]['catalog'] = cat
+        apidata._catalogs[cat] = OrderedDict(sorted(dict(
+            zip([x['name'] for x in apidata._catalogs[cat]],
+                apidata._catalogs[cat])).items(),
             key=lambda s: (s[0].upper(), s[0])))
-        if cat not in extra_events:
-            extra_events[cat] = OrderedDict()
+        if cat not in apidata._extras:
+            apidata._extras[cat] = OrderedDict()
 
     logger.info('Creating alias dictionary and position arrays...')
-    rdnames = []
-    ras = []
-    decs = []
-    all_events = []
+    apidata._rdnames = []
+    apidata._ras = []
+    apidata._decs = []
+    apidata._all = []
 
-    # Load object catalogs.
-    for cat in catdict:
-        catalog_keys[cat] = set()
-        for event in catalogs[cat]:
+    # Load object apidata._catalogs.
+    for cat in apidata._CATS:
+        apidata._cat_keys[cat] = set()
+        for event in apidata._catalogs[cat]:
             add_event(cat, event, convert_coords=False)
 
-    all_events = list(sorted(set(all_events), key=lambda s: (s.upper(), s)))
-    coo = coord(ras, decs, unit=(un.hourangle, un.deg))
-    del(ras, decs)
+    apidata._all = list(
+        sorted(set(apidata._all), key=lambda s: (s.upper(), s)))
+    apidata._coo = coord(apidata._ras, apidata._decs,
+                         unit=(un.hourangle, un.deg))
+    del(apidata._ras, apidata._decs)
 
     # Re-append events that were added later.
-    for cat in extra_events:
-        for event in extra_events[cat]:
-            if event not in catalogs[cat]:
-                catalogs[cat][event] = extra_events[cat][event]
+    for cat in apidata._extras:
+        for event in apidata._extras[cat]:
+            if event not in apidata._catalogs[cat]:
+                apidata._catalogs[cat][event] = apidata._extras[cat][event]
             add_event(cat, event)
+
 
 def load_atels():
     """Reload the ATel dictionaries."""
-    global atels, atel_txts
     # Load astronomer's telegrams.
     with gzip.open(os.path.join(
-            '/root', 'better-atel', 'atels.json.gz'), 'rb') as f:
-        atels = json.loads(f.read().decode('utf-8'))
-    atel_txts = [(x.get('title', '') + ': ' + x.get('body', '') + ' [' +
-                  ', '.join(x.get('authors', '')) + ']').lower()
-                 for x in atels]
+            '/root', 'better-atel', 'apidata._atels.json.gz'), 'rb') as f:
+        apidata._atels = json.loads(f.read().decode('utf-8'))
+    apidata._atel_txts = [
+        (x.get('title', '') + ': ' + x.get('body', '') + ' [' +
+         ', '.join(x.get('authors', '')) + ']').lower()
+        for x in apidata._atels]
 
 
 def handle_tns(event):
     """Add a newly announced TNS event."""
-    global all_aliases, catalogs, tnskey, extra_events
     from astrocats.catalog.entry import ENTRY, Entry
     import time
     import urllib
@@ -216,7 +199,7 @@ def handle_tns(event):
     cat = 'sne'
 
     # Check if already in catalog, if so skip.
-    if name.lower() in all_aliases:
+    if name.lower() in apidata._all_aliases:
         return False
 
     new_event = Entry(name=name)
@@ -224,7 +207,7 @@ def handle_tns(event):
     source = new_event.add_source(name=tns_name, url=tns_url)
 
     data = urllib.parse.urlencode({
-        'api_key': tnskey,
+        'api_key': apidata._tnskey,
         'data': json.dumps({
             'objname': qname,
             'photometry': '1'
@@ -259,24 +242,27 @@ def handle_tns(event):
     if objdict.get('dec'):
         new_event.add_quantity(ENTRY.DEC, objdict['dec'], source=source)
     if objdict.get('redshift'):
-        new_event.add_quantity(ENTRY.REDSHIFT, objdict['redshift'], source=source)
+        new_event.add_quantity(
+            ENTRY.REDSHIFT, objdict['redshift'], source=source)
     if objdict.get('internal_name'):
-        new_event.add_quantity(ENTRY.ALIAS, objdict['internal_name'], source=source)
+        new_event.add_quantity(
+            ENTRY.ALIAS, objdict['internal_name'], source=source)
 
     new_event.sanitize()
     oentry = new_event._ordered(new_event)
 
     outfile = os.path.join(
-        ac_path, catdict[cat][0], 'output', catdict[cat][2], name + '.json')
+        apidata._AC_PATH, apidata._CATS[cat][0], 'output',
+        apidata._CATS[cat][2], name + '.json')
     if not os.path.exists(outfile):
         entabbed_json_dump(
             {name: oentry}, open(outfile, 'w'),
             separators=(',', ':'))
 
     # Then, load it into the API dicts.
-    if name not in catalogs[cat]:
-        catalogs[cat][name] = oentry
-        extra_events[cat][name] = oentry
+    if name not in apidata._catalogs[cat]:
+        apidata._catalogs[cat][name] = oentry
+        apidata._extras[cat][name] = oentry
 
     add_event(cat, name)
 
@@ -285,24 +271,24 @@ def handle_tns(event):
 
 def add_event(cat, event, convert_coords=True):
     """Add event to global arrays."""
-    global all_events, catalog_keys, aliases, ras, decs, rdnames, coo
-    all_events.append(event)
-    catalog_keys[cat].update(list(catalogs[cat][event].keys()))
-    levent = catalogs[cat].get(event, {})
+    apidata._all.append(event)
+    apidata._cat_keys[cat].update(list(apidata._catalogs[cat][event].keys()))
+    levent = apidata._catalogs[cat].get(event, {})
     laliases = levent.get('alias', [])
     lev = event.lower()
     laliases = list(set([lev,
-        replace_multiple(lev, ['sn', 'at']) if lev.startswith(('sn', 'at')) else lev] + [
-            x['value'].lower() for x in laliases] + [
-                replace_multiple(x['value'].lower(), ['sn', 'at'])
-                for x in laliases if x['value'].lower().startswith((
-                'sn', 'at'))
-            ] + [replace_multiple(x['value'].lower(), ['-', '–'])
-        for x in laliases]))
+                         replace_multiple(lev, ['sn', 'at']) if
+                         lev.startswith(('sn', 'at')) else lev] + [
+        x['value'].lower() for x in laliases] + [
+        replace_multiple(x['value'].lower(), ['sn', 'at'])
+        for x in laliases if x['value'].lower().startswith((
+            'sn', 'at'))
+    ] + [replace_multiple(x['value'].lower(), ['-', '–'])
+         for x in laliases]))
     for alias in laliases:
-        aliases.setdefault(alias.lower().replace(' ', ''),
-                           []).append([cat, event, alias])
-        all_aliases.add(alias)
+        apidata._aliases.setdefault(alias.lower().replace(' ', ''),
+                                    []).append([cat, event, alias])
+        apidata._all_aliases.add(alias)
     lra = levent.get('ra')
     ldec = levent.get('dec')
     if lra is None and ldec is None:
@@ -313,20 +299,21 @@ def add_event(cat, event, convert_coords=True):
         return
     if not raregex.match(lra) or not decregex.match(ldec):
         return
-    rdnames.append(event)
+    apidata._rdnames.append(event)
     if convert_coords:
-        coo = coord_concat((coo, coord(lra, ldec, unit=(un.hourangle, un.deg))))
+        apidata._coo = coord_concat(
+            (apidata._coo, coord(lra, ldec, unit=(un.hourangle, un.deg))))
     else:
-        ras.append(lra)
-        decs.append(ldec)
+        apidata._ras.append(lra)
+        apidata._decs.append(ldec)
 
 
 class Catalogs(Resource):
-    """Return all catalogs."""
+    """Return all apidata._catalogs."""
 
     def get(self, catalog_name):
         """Get result."""
-        return catalogs
+        return apidata._catalogs
 
 
 class Catalog(Resource):
@@ -447,18 +434,19 @@ class Catalog(Resource):
         """Retrieve astronomer's telegram(s) given query."""
         atel_ret = []
         if is_integer(query_string):
-            atel_ret = [atels[int(query_string) - 1]]
+            atel_ret = [apidata._atels[int(query_string) - 1]]
         elif query_string is not None:
             qsls = [query_string.strip().lower()]
-            for a in aliases:
-                if qsls[0] in aliases[a]:
-                    qsls = [x for x in aliases[a] if len(x) > 3]
+            for a in apidata._aliases:
+                if qsls[0] in apidata._aliases[a]:
+                    qsls = [x for x in apidata._aliases[a] if len(x) > 3]
                     break
-            # Assume string is/are event name(s), find atels with those events.
-            for ai, atxt in enumerate(atel_txts):
+            # Assume string is/are event name(s), find apidata._atels with
+            # those events.
+            for ai, atxt in enumerate(apidata._atel_txts):
                 for qsl in qsls:
                     if qsl in atxt or qsl.replace(' ', '') in atxt:
-                        atel_ret.append(atels[ai])
+                        atel_ret.append(apidata._atels[ai])
                         break
 
         if atel_ret:
@@ -609,33 +597,36 @@ class Catalog(Resource):
                 if (width is not None and height is not None and
                         width > 0.0 and height > 0.0):
                     idxcat = np.where((abs(
-                        lcoo.ra - coo.ra) <= width * un.arcsecond) & (
-                        abs(lcoo.dec - coo.dec) <= height * un.arcsecond))[0]
+                        lcoo.ra - apidata._coo.ra) <= width * un.arcsecond) & (
+                        abs(lcoo.dec - apidata._coo.dec) <= height *
+                        un.arcsecond))[0]
                 elif width is not None and width > 0.0:
-                    idxcat = np.where(abs(lcoo.ra - coo.ra) <=
+                    idxcat = np.where(abs(lcoo.ra - apidata._coo.ra) <=
                                       width * un.arcsecond)[0]
                 elif height is not None and height > 0.0:
                     idxcat = np.where(abs(
-                        lcoo.dec - coo.dec) <= height * un.arcsecond)[0]
+                        lcoo.dec - apidata._coo.dec) <= height * un.arcsecond)[
+                            0]
                 else:
                     if radius is None or radius == 0.0:
                         radius = 1.0
-                    idxcat = np.where(lcoo.separation(coo) <=
+                    idxcat = np.where(lcoo.separation(apidata._coo) <=
                                       radius * un.arcsecond)[0]
                 if len(idxcat):
-                    ename_arr = [rdnames[i].replace('+', '$PLUS$')
+                    ename_arr = [apidata._rdnames[i].replace('+', '$PLUS$')
                                  for i in idxcat]
                 else:
                     return msg('no_objects')
-            elif catalog_name in catalogs:
+            elif catalog_name in apidata._catalogs:
                 ename_arr = [i.replace('+', '$PLUS$')
-                             for i in catalogs[catalog_name]]
+                             for i in apidata._catalogs[catalog_name]]
                 search_all = True
             else:
                 ename_arr = [
                     a for b in [
                         [i.replace('+', '$PLUS$')
-                         for i in catalogs[cat]] for cat in catalogs
+                         for i in apidata._catalogs[
+                             cat]] for cat in apidata._catalogs
                     ] for a in b
                 ]
                 search_all = True
@@ -648,13 +639,13 @@ class Catalog(Resource):
                 return self.retrieve_objects(
                     catalog_name, event_name=ename, full=True)
             search_all = True
-            if catalog_name not in catdict:
+            if catalog_name not in apidata._CATS:
                 qname = '+'.join(list(set(sorted([
-                    a for b in [catalog_keys[x]
-                                for x in catalog_keys] for a in b]))))
+                    a for b in [apidata._cat_keys[x]
+                                for x in apidata._cat_keys] for a in b]))))
             else:
                 qname = '+'.join(
-                    list(sorted(set(catalog_keys[catalog_name]))))
+                    list(sorted(set(apidata._cat_keys[catalog_name]))))
 
         # if fmt is not None and qname is None:
         #    return Response((
@@ -673,7 +664,7 @@ class Catalog(Resource):
                 continue
             if ni < len(event_names) - 1:
                 jname = '+'.join(event_names[ni:ni + 2])
-                if jname.lower().replace(' ', '') in aliases:
+                if jname.lower().replace(' ', '') in apidata._aliases:
                     nevent_names.append(jname)
                     joined = True
                     continue
@@ -684,7 +675,7 @@ class Catalog(Resource):
 
         if not len(event_names):
             search_all = True
-            event_names = all_events
+            event_names = apidata._all
 
         # Quantities
         quantity_names = [
@@ -714,7 +705,7 @@ class Catalog(Resource):
         for event in event_names:
             skip_entry = False
             my_cat, my_event = None, None
-            alopts = aliases.get(event.lower().replace(' ', ''), [])
+            alopts = apidata._aliases.get(event.lower().replace(' ', ''), [])
             for opt in alopts:
                 if opt[0] == catalog_name:
                     my_cat, my_event, my_alias = tuple(opt)
@@ -731,8 +722,8 @@ class Catalog(Resource):
             if full:
                 fcatalogs.update(json.load(
                     open(os.path.join(
-                        ac_path, catdict[my_cat][0], 'output', 'json',
-                        get_filename(my_event)), 'r'),
+                        apidata._AC_PATH, apidata._CATS[my_cat][0], 'output',
+                        'json', get_filename(my_event)), 'r'),
                     object_pairs_hook=OrderedDict))
                 sources[my_event] = [
                     x.get('bibcode', x.get('arxivid', x.get('name')))
@@ -741,7 +732,8 @@ class Catalog(Resource):
                 if full:
                     edict[event] = fcatalogs.get(my_event, {})
                 else:
-                    edict[event] = catalogs.get(my_cat, {}).get(my_event, {})
+                    edict[event] = apidata._catalogs.get(
+                        my_cat, {}).get(my_event, {})
             else:
                 # Check if user passed quantity or attribute names to filter
                 # by.
@@ -750,7 +742,7 @@ class Catalog(Resource):
                     my_event_dict = fcatalogs.get(
                         my_event, {})
                 else:
-                    my_event_dict = catalogs.get(my_cat, {}).get(
+                    my_event_dict = apidata._catalogs.get(my_cat, {}).get(
                         my_event, {})
 
                 if aname is None:
@@ -1026,7 +1018,7 @@ en = '<string:event_name>'
 qn = '<string:quantity_name>'
 an = '<string:attribute_name>'
 
-api.add_resource(Catalogs, '/'.join(['', cn, 'catalogs']))
+api.add_resource(Catalogs, '/'.join(['', cn, 'apidata._catalogs']))
 api.add_resource(
     Catalog,
     '/'.join(['', cn]),
@@ -1046,7 +1038,7 @@ api.add_resource(
 
 # Load TNS API key.
 with open('tns.key', 'r') as f:
-    tnskey = f.read().splitlines()[0]
+    apidata._tnskey = f.read().splitlines()[0]
 
 load_cats()
 

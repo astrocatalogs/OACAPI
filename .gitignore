@@ -104,3 +104,4 @@ ENV/
 *.tags*
 *.swp
 tns.key
+.DS_Store
