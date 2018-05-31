@@ -32,5 +32,6 @@ after_script:
 
   # execute the API tests
   - CURL_OUTPUT=$(curl -s $NGROK_URL/)
+  - grep -L -q "message" < $(CURL_OUTPUT)
 
   - kill $APP_PID
