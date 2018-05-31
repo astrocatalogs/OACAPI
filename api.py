@@ -40,7 +40,6 @@ catalog_keys = OrderedDict()
 aliases = OrderedDict()
 all_aliases = set()
 coo = None
-rdnames = []
 extra_events = {}
 
 ac_path = os.path.join('/root', 'astrocats', 'astrocats')
@@ -144,7 +143,8 @@ def bool_str(x):
 
 def load_cats():
     """Reload the catalog dictionaries."""
-    global ras, decs, catdict, catalogs, all_events, catalog_keys, coo, extra_events
+    global ras, decs, catdict, catalogs, all_events, catalog_keys, coo, extra_events, rdnames
+
 
     logger.info('Loading catalog...')
     for cat in catdict:
@@ -161,6 +161,7 @@ def load_cats():
             extra_events[cat] = OrderedDict()
 
     logger.info('Creating alias dictionary and position arrays...')
+    rdnames = []
     ras = []
     decs = []
     all_events = []
