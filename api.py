@@ -165,6 +165,7 @@ def load_cats():
     ras = []
     decs = []
     all_events = []
+    all_aliases = set()
 
     # Load object catalogs.
     for cat in catdict:
@@ -179,9 +180,9 @@ def load_cats():
     # Re-append events that were added later.
     for cat in extra_events:
         for event in extra_events[cat]:
-            if event not in catalogs[cat]:
+            if event not in all_aliases:
                 catalogs[cat][event] = extra_events[cat][event]
-            add_event(cat, event)
+                add_event(cat, event)
 
 def load_atels():
     """Reload the ATel dictionaries."""
