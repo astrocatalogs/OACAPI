@@ -298,8 +298,7 @@ def add_event(cat, event, convert_coords=True):
                 replace_multiple(x['value'].lower(), ['sn', 'at'])
                 for x in laliases if x['value'].lower().startswith((
                 'sn', 'at'))
-            ] + [replace_multiple(x['value'].lower(), ['-', '–'])
-        for x in laliases]))
+            ]))
     for alias in laliases:
         aliases.setdefault(alias.lower().replace(' ', ''),
                            []).append([cat, event, alias])
