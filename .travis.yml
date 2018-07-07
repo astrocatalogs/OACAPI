@@ -1,0 +1,57 @@
+language: python
+python:
+  - "3.6"
+
+addons:
+  apt:
+    packages:
+      - ca-certificates
+
+before_install:
+# Install packages
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+        wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
+    elif [[ "$TRAVIS_PYTHON_VERSION" == "3.5" ]]; then
+        wget https://repo.continuum.io/miniconda/Miniconda3-4.3.31-Linux-x86_64.sh -O miniconda.sh;
+    else
+        wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda;
+
+install:
+  - conda update setuptools
+  - conda config --add channels conda-forge
+  - conda install --yes astrocats astropy flask numpy six
+  - pip install flask_compress flask_restful
+
+script:
+  - echo "Unit tests"
+
+after_script:
+
+  # start the web app
+  - |
+    python api.py &
+    APP_PID=$!
+
+  # download and install ngrok
+  - curl -s https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip > ngrok.zip
+  - unzip ngrok.zip
+  - ./ngrok http 5000 > /dev/null &
+
+  # sleep to allow ngrok to initialize
+  - sleep 2
+
+  # extract the ngrok url
+  - NGROK_URL=$(curl -s localhost:4040/api/tunnels/command_line | jq --raw-output .public_url)
+
+  # execute the API tests
+  - CURL_OUTPUT=$(curl -s $NGROK_URL/)
+  - echo $CURL_OUTPUT
+  - grep -L -q "message" < $CURL_OUTPUT
+
+  - kill $APP_PID
