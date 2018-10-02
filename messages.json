@@ -6,6 +6,7 @@
     "cats_reloaded":"Catalogs reloaded from disk.",
     "event_not_found":"Event '{}' not found in any catalog.",
     "failed_tns":"Event {} not added from TNS.",
+    "file_not_found":"Event {} not found at its expected path, please create an issue at <a href=\"https://github.com/astrocatalogs/supernovae/issues\">https://github.com/astrocatalogs/supernovae/issues</a>.",
     "fmt_unsupported":"{} not supported for this query type.",
     "height_limited":"Height limited to {} degrees.",
     "invalid_regex":"Invalid regex '{}' specified for '{}'.",
@@ -15,11 +16,11 @@
     "no_catalog_route":"The astrocats.space domain does not support 'catalog/' routes. Please use one of the specific catalog routes instead (e.g. api.sne.space for supernovae, api.tde.space for tidal disruptions, etc.).",
     "no_delimited":"This query does not support delimited output.",
     "no_objects":"No objects found within specified search region.",
-    "no_root_data":"Welcome to the API of the Open Astronomy Catalogs! Please see https://github.com/astrocatalogs/OACAPI for API examples.",
+    "no_root_data":"Welcome to the API of the Open Astronomy Catalogs! Please see <a href=\"https://github.com/astrocatalogs/OACAPI\">https://github.com/astrocatalogs/OACAPI</a> for API examples.",
     "one_spectra":"When retrieving spectra in delimited format, exactly one at a time can be requested.",
     "radius_limited":"Radius limited to {} degrees.",
     "spectra_limits":"When retrieving spectrum data in delimited format, must specify only one event, only request the 'spectra' quantity, and request no other attributes aside from 'data.'",
-    "too_expensive":"Query too expensive, we suggest cloning the OAC catalogs locally (see e.g. https://sne.space/download/.",
+    "too_expensive":"Query too expensive, we suggest cloning the OAC catalogs locally (see e.g. <a href=\"https://sne.space/download/\">https://sne.space/download/</a>.",
     "unknown_fmt":"Unknown format.",
     "width_limited":"Width limited to {} degrees."
 }

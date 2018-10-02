@@ -105,3 +105,4 @@ ENV/
 *.swp
 tns.key
 .DS_Store
+extras.json

@@ -118,6 +118,12 @@ def get_filename(name):
     return name.replace('/', '_') + '.json'
 
 
+def get_output_json_path(name, cat):
+    """Get full path to output JSON file."""
+    return os.path.join(apidata._AC_PATH, apidata._CATS[cat][0],
+        'output', 'json', get_filename(name))
+
+
 def bool_str(x):
     """Return T or F for a bool."""
     return 'T' if x else 'F'
@@ -263,6 +269,10 @@ def handle_tns(event):
     if name not in apidata._catalogs[cat]:
         apidata._catalogs[cat][name] = oentry
         apidata._extras[cat][name] = oentry
+
+    # Record the extras dictionary for debugging.
+    entabbed_json_dump(apidata._extras, open('extras.json', 'w'),
+                       separators=(',', ':'))
 
     add_event(cat, name)
 
@@ -657,16 +667,12 @@ class Catalog(Resource):
         nevent_names = []
         joined = False
         for ni, name in enumerate(event_names):
-            if joined:
-                joined = False
-                continue
-            if ni < len(event_names) - 1:
-                jname = '+'.join(event_names[ni:ni + 2])
-                if jname.lower().replace(' ', '') in apidata._aliases:
-                    nevent_names.append(jname)
-                    joined = True
-                    continue
-            nevent_names.append(name)
+            try:
+                int(name)
+            except Exception:
+                nevent_names.append(name)
+            else:
+                nevent_names[-1] += '+' + name
         event_names = nevent_names
 
         event_names = [x.replace('$PLUS$', '+') for x in event_names]
@@ -718,11 +724,27 @@ class Catalog(Resource):
                     return msg('event_not_found', event)
                 continue
             if full:
+                fpath = get_output_json_path(my_event, my_cat)
+                if not os.path.exists(fpath):
+                    for opt in alopts:
+                        fpath = None
+                        if opt == my_event:
+                            continue
+                        fpath = get_output_json_path(opt, my_cat)
+                        if os.path.exists(fpath):
+                            logger.info(
+                                '"{}.json" not found at expected path, '
+                                'found at "{}.json" instead.'.format(my_event, opt))
+                            break
+                        else:
+                            logger.info(
+                                '"{}.json" not found at expected path or '
+                                'alternative paths [{}].'
+                                .format(my_event, ', '.join(alopts)))
+                            return msg('file_not_found')
+
                 fcatalogs.update(json.load(
-                    open(os.path.join(
-                        apidata._AC_PATH, apidata._CATS[my_cat][0], 'output',
-                        'json', get_filename(my_event)), 'r'),
-                    object_pairs_hook=OrderedDict))
+                    open(fpath, 'r'), object_pairs_hook=OrderedDict))
                 sources[my_event] = [
                     x.get('bibcode', x.get('arxivid', x.get('name')))
                     for x in fcatalogs[my_event].get('sources')]
