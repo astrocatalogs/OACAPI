@@ -19,10 +19,12 @@ from werkzeug.contrib.fixers import ProxyFix
 from classes.apidata import ApiData
 from flask_compress import Compress
 from flask_restful import Api, Resource
+from flask_cors import CORS
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app)
 Compress(app)
+CORS(app)
 api = Api(app)
 apidata = ApiData()
 
@@ -299,7 +301,7 @@ def add_event(cat, event, convert_coords=True):
         apidata._all_aliases.add(alias)
     lra = levent.get('ra')
     ldec = levent.get('dec')
-    if lra is None and ldec is None:
+    if lra is None or ldec is None:
         return
     lra = lra[0].get('value')
     ldec = ldec[0].get('value')
