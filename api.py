@@ -357,7 +357,8 @@ class Catalog(Resource):
         'sortby',
         'event',
         'quantity',
-        'attribute'
+        'attribute',
+        'catalog'
     ])
     _CASE_SENSITIVE_ATTR = set([
         'band'
@@ -745,8 +746,12 @@ class Catalog(Resource):
                                 .format(my_event, ', '.join(alopts)))
                             return msg('file_not_found')
 
-                fcatalogs.update(json.load(
-                    open(fpath, 'r'), object_pairs_hook=OrderedDict))
+                file_event = json.load(
+                    open(fpath, 'r'), object_pairs_hook=OrderedDict)
+                _, file_event[my_event] = file_event.popitem()
+                file_event[my_event]['catalog'] = my_cat
+
+                fcatalogs.update(file_event)
                 sources[my_event] = [
                     x.get('bibcode', x.get('arxivid', x.get('name')))
                     for x in fcatalogs[my_event].get('sources')]
@@ -780,6 +785,10 @@ class Catalog(Resource):
 
                 if not skip_entry:
                     for quantity in quantity_names:
+                        if not search_all and not my_event_dict.get(quantity) and not full:
+                            use_full = True
+                            break
+
                         my_quantity = listify(my_event_dict.get(quantity, {}))
                         closest_locs = []
                         if closest is not None:
@@ -787,15 +796,14 @@ class Catalog(Resource):
                                 abs(np.mean([float(y) for y in listify(
                                     x.get(i))]) - float(includes[
                                         i].pattern)) for x in my_quantity])
-                                for i in includes if len(my_quantity) and
+                                for i in includes if my_quantity and
                                 is_number(includes[i].pattern) and
                                 all([is_number(x.get(i, ''))
                                      for x in my_quantity])]))))
 
                         if aname is None and quantity in my_event_dict:
                             qdict[quantity] = [x for xi, x in enumerate(
-                                my_quantity) if not len(
-                                    closest_locs) or xi in closest_locs]
+                                my_quantity) if not closest_locs or xi in closest_locs]
 
                             if item is not None:
                                 try:
@@ -812,9 +820,6 @@ class Catalog(Resource):
                                 closest_locs=closest_locs,
                                 sources=np.array(sources.get(my_event, [])))
 
-                        if not search_all and not qdict.get(quantity):
-                            use_full = True
-                            break
                 if not full and use_full:
                     new_event_names = list(event_names)
                     break
@@ -858,7 +863,7 @@ class Catalog(Resource):
                     [x.get(a) is not None for a in anames]) and all(
                     [x.get(a) is not None for a in
                         self._ALWAYS_FULL.intersection(anames)]) and (
-                    (len(closest_locs) and xi in closest_locs) or
+                    (closest_locs and xi in closest_locs) or
                     all([((i in x) if (includes[i].pattern == '') else (
                          includes[i].match(commify(x.get(i, '')))
                          if i in self._CASE_SENSITIVE_ATTR else
@@ -874,8 +879,8 @@ class Catalog(Resource):
                  if full else [x.get(a, '') for a in anames])
                 for xi, x in enumerate(quantity) if all(
                     [x.get(a) is not None for a in anames]) and
-                (not len(closest_locs) or xi in closest_locs) and (
-                    (len(closest_locs) and xi in closest_locs) or
+                (not closest_locs or xi in closest_locs) and (
+                    (closest_locs and xi in closest_locs) or
                     all([((i in x) if (includes[i].pattern == '') else (
                          includes[i].match(commify(x.get(i, '')))
                          if i in self._CASE_SENSITIVE_ATTR else
