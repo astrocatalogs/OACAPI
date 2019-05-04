@@ -246,15 +246,15 @@ def handle_tns(event):
     objdict = sortOD(objdict)
 
     if objdict.get('ra'):
-        new_event.add_quantity(ENTRY.RA, objdict['ra'], source=source)
+        new_event.add_quantity(ENTRY.RA, str(objdict['ra']), source=source)
     if objdict.get('dec'):
-        new_event.add_quantity(ENTRY.DEC, objdict['dec'], source=source)
+        new_event.add_quantity(ENTRY.DEC, str(objdict['dec']), source=source)
     if objdict.get('redshift'):
         new_event.add_quantity(
-            ENTRY.REDSHIFT, objdict['redshift'], source=source)
+            ENTRY.REDSHIFT, str(objdict['redshift']), source=source)
     if objdict.get('internal_name'):
         new_event.add_quantity(
-            ENTRY.ALIAS, objdict['internal_name'], source=source)
+            ENTRY.ALIAS, str(objdict['internal_name']), source=source)
 
     new_event.sanitize()
     oentry = new_event._ordered(new_event)
