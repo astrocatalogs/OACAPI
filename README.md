@@ -8,17 +8,9 @@ API usage over the last 7 days:
 [![Uniques](https://img.shields.io/badge/dynamic/json.svg?label=unique%20users&colorB=bc44ee&query=$.unique&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php&logo=odnoklassniki&logoColor=bc44ee)](https://github.com/astrocatalogs/OACAPI)
 [![Trending](https://img.shields.io/badge/dynamic/json.svg?label=trending%20objects&colorB=550000&query=$.top5&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php&logo=koding&logoColor=550000)](https://github.com/astrocatalogs/OACAPI)
 
-The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the Open Astronomy Catalogs (e.g. the <a href="https://sne.space">Open Supernova</a>, <a href="https://tde.space">Tidal Disruption</a>, <a href="https://kilonova.space">Kilonova</a>, and <a href="https://faststars.space">Fast Stars</a> Catalogs). The API is accessible via a route that works via any of the catalog domains,
+The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the [Open Astronomy Catalogs](https://astrocats.space). The API is accessible via a route that works via any of the catalog domains,
 
 https://api.astrocats.space/
-
-https://api.sne.space/
-
-https://api.tde.space/
-
-https://api.kilonova.space/
-
-https://api.faststars.space/
 
 where the only difference is preference in catalog when returning items that appear on multiple catalogs. For the examples below we will (usually) use the api.astrocats.space route. By default, all returned values are provided in JSON format, unless a `format=` URL variable is provided.
 
