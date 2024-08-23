@@ -50,13 +50,13 @@ https://api.astrocats.space/catalog?ra=21:23:32.16&dec=-53:01:36.08&radius=2
 
 #### Return all supernova metadata in CSV format
 
-https://api.astrocats.space/sne/catalog?format=CSV
+https://api.astrocats.space/catalog/sne?format=CSV
 
 By default, queries such as the two above will return the catalog entries for objects that satisfy the search conditions. To return data from a specific catalog when searching by a criterion such as position, the user should insert `catalog/` into the URL before the rest of the query of the specific catalog they are interested in, as shown in the example below:
 
 #### Redshifts of all supernovae with a redshift reported within 5° of a coordinate, in CSV format
 
-https://api.astrocats.space/sne/catalog/redshift?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv&redshift
+https://api.astrocats.space/catalog/sne/redshift?ra=10:42:16.88&dec=-24:13:12.13&radius=18000&format=csv&redshift
 
 If the user instead wishes to return info on all objects across all catalogs, the `all/` route should be used instead (any URL can be used with this route):
 
