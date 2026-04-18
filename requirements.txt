@@ -2,3 +2,10 @@ astrocats
 numpy
 flask
 six
+astropy
+flask_compress
+flask_restful
+flask_cors
+gunicorn
+sqlalchemy
+fastmcp

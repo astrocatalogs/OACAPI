@@ -136,3 +136,44 @@ https://api.astrocats.space/catalog/photometry/time+band+magnitude?ra=21:23:32.1
 #### Return the instruments used to produce spectra within a 5° of a given coordinate, in CSV format
 
 https://api.astrocats.space/catalog/spectra/instrument?ra=21:23:32.16&dec=-53:01:36.08&radius=18000&format=csv
+
+## Modern backend and deployment
+
+This project now supports a modern SQLite-backed runtime that preserves the API
+signature and response semantics while reducing memory pressure on constrained
+nodes. The API does not interact with external services.
+
+### Runtime modes
+
+Use environment variables to choose the backend:
+
+- `OAC_BACKEND=sqlite` (default): query a pre-built SQLite snapshot.
+- `OAC_BACKEND=legacy`: load original JSON files directly from astrocatalog
+  repositories.
+
+For SQLite mode:
+
+- `OAC_DB_PATH` points to the sqlite file (default `/data/oacapi.db`).
+- Build the sqlite snapshot using:
+
+```bash
+python scripts/ingest_static_catalogs.py --db-path /data/oacapi.db --ac-path /root/astrocats/astrocats
+```
+
+### MCP layer
+
+An MCP server is provided in `mcp_server.py` and exposes:
+
+- `query_api`: executes the same route/query semantics as the HTTP API.
+- `health`: service health probe.
+
+### Docker Compose deployment
+
+Use compose to run API + MCP and optionally ingest:
+
+```bash
+docker compose --profile ingest run --rm ingest
+docker compose up --build -d api mcp
+```
+
+See `docs/deployment-compose.md` for full instructions.

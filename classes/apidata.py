@@ -2,6 +2,8 @@
 import os
 from collections import OrderedDict
 
+from classes.sqlite_store import SqliteStore
+
 
 class ApiData(object):
     """Object to store data for the OACAPI."""
@@ -24,6 +26,9 @@ class ApiData(object):
 
     def __init__(self):
         """Initialize."""
+        self._backend = os.environ.get('OAC_BACKEND', 'sqlite').lower()
+        self._db_path = os.environ.get('OAC_DB_PATH', os.path.join('/data', 'oacapi.db'))
+        self._store = SqliteStore(self._db_path)
         self._coo = None
         self._catalogs = OrderedDict()
         self._cat_keys = OrderedDict()
@@ -34,3 +39,9 @@ class ApiData(object):
         self._decs = []
         self._all_events = []
         self._rdnames = []
+        self._all = []
+
+    @property
+    def use_sqlite(self):
+        """Return whether sqlite backend should be used."""
+        return self._backend == 'sqlite' and self._store.exists()

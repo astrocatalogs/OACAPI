@@ -8,13 +8,16 @@ from collections import OrderedDict
 from timeit import default_timer as timer
 
 import numpy as np
-from astrocats.catalog.utils import is_integer, is_number, sortOD
+from astrocats.catalog.utils import is_integer, is_number
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
 from astropy.coordinates import concatenate as coord_concat
 from flask import Flask, Response, request
 from six import string_types
-from werkzeug.contrib.fixers import ProxyFix
+try:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+except Exception:
+    from werkzeug.contrib.fixers import ProxyFix
 
 from classes.apidata import ApiData
 from flask_compress import Compress
@@ -122,6 +125,8 @@ def get_filename(name):
 
 def get_output_json_path(name, cat):
     """Get full path to output JSON file."""
+    if apidata.use_sqlite:
+        return None
     return os.path.join(apidata._AC_PATH, apidata._CATS[cat][0],
         'output', 'json', get_filename(name))
 
@@ -134,20 +139,43 @@ def bool_str(x):
 def load_cats():
     """Reload the catalog dictionaries."""
     logger.info('Loading catalog...')
+    apidata._catalogs = OrderedDict()
+    apidata._cat_keys = OrderedDict()
+    apidata._aliases = OrderedDict()
+    apidata._all_aliases = set()
+
+    if apidata._backend == 'sqlite':
+        if apidata.use_sqlite:
+            logger.info('Loading catalog data from sqlite backend...')
+            apidata._catalogs, apidata._cat_keys = apidata._store.load_catalogs()
+            apidata._extras = OrderedDict(
+                (cat, OrderedDict()) for cat in apidata._catalogs)
+        else:
+            logger.warning(
+                'Configured sqlite backend but database %s is missing. '
+                'Starting with empty catalog cache.',
+                apidata._db_path
+            )
+            apidata._extras = OrderedDict()
+    else:
+        for cat in apidata._CATS:
+            apidata._catalogs[cat] = json.load(open(os.path.join(
+                apidata._AC_PATH, apidata._CATS[cat][0], 'output',
+                apidata._CATS[cat][1]), 'r'),
+                object_pairs_hook=OrderedDict)
+            # Add some API-specific fields to each catalog.
+            for i, x in enumerate(apidata._catalogs[cat]):
+                apidata._catalogs[cat][i]['catalog'] = cat
+            apidata._catalogs[cat] = OrderedDict(sorted(dict(
+                zip([x['name'] for x in apidata._catalogs[cat]],
+                    apidata._catalogs[cat])).items(),
+                key=lambda s: (s[0].upper(), s[0])))
+            if cat not in apidata._extras:
+                apidata._extras[cat] = OrderedDict()
     for cat in apidata._CATS:
-        apidata._catalogs[cat] = json.load(open(os.path.join(
-            apidata._AC_PATH, apidata._CATS[cat][0], 'output',
-            apidata._CATS[cat][1]), 'r'),
-            object_pairs_hook=OrderedDict)
-        # Add some API-specific fields to each catalog.
-        for i, x in enumerate(apidata._catalogs[cat]):
-            apidata._catalogs[cat][i]['catalog'] = cat
-        apidata._catalogs[cat] = OrderedDict(sorted(dict(
-            zip([x['name'] for x in apidata._catalogs[cat]],
-                apidata._catalogs[cat])).items(),
-            key=lambda s: (s[0].upper(), s[0])))
-        if cat not in apidata._extras:
-            apidata._extras[cat] = OrderedDict()
+        apidata._catalogs.setdefault(cat, OrderedDict())
+        apidata._cat_keys.setdefault(cat, set())
+        apidata._extras.setdefault(cat, OrderedDict())
 
     logger.info('Creating alias dictionary and position arrays...')
     apidata._rdnames = []
@@ -156,8 +184,9 @@ def load_cats():
     apidata._all = []
 
     # Load object apidata._catalogs.
-    for cat in apidata._CATS:
-        apidata._cat_keys[cat] = set()
+    for cat in apidata._catalogs:
+        if cat not in apidata._cat_keys:
+            apidata._cat_keys[cat] = set()
         for event in apidata._catalogs[cat]:
             add_event(cat, event, convert_coords=False)
 
@@ -178,107 +207,18 @@ def load_cats():
 def load_atels():
     """Reload the ATel dictionaries."""
     # Load astronomer's telegrams.
-    with gzip.open(os.path.join(
-            '/root', 'better-atel', 'atels.json.gz'), 'rb') as f:
+    atel_path = os.path.join('/root', 'better-atel', 'atels.json.gz')
+    if not os.path.exists(atel_path):
+        logger.warning('ATel file %s missing, disabling ATel lookups.', atel_path)
+        apidata._atels = []
+        apidata._atel_txts = []
+        return
+    with gzip.open(atel_path, 'rb') as f:
         apidata._atels = json.loads(f.read().decode('utf-8'))
     apidata._atel_txts = [
         (x.get('title', '') + ': ' + x.get('body', '') + ' [' +
          ', '.join(x.get('authors', '')) + ']').lower()
         for x in apidata._atels]
-
-
-def handle_tns(event):
-    """Add a newly announced TNS event."""
-    from astrocats.catalog.entry import ENTRY, Entry
-    import time
-    import urllib
-
-    tns_name = 'Transient Name Server'
-    tns_url = 'https://wis-tns.weizmann.ac.il/'
-    # First, create the JSON file.
-
-    if event.startswith(('AT', 'SN', 'at', 'sn')):
-        name = event.upper()
-    else:
-        name = 'AT' + event
-
-    qname = replace_multiple(name.lower(), ['at', 'sn'])
-
-    cat = 'sne'
-
-    # Check if already in catalog, if so skip.
-    if name.lower() in apidata._all_aliases:
-        return False
-
-    new_event = Entry(name=name)
-
-    source = new_event.add_source(name=tns_name, url=tns_url)
-
-    data = urllib.parse.urlencode({
-        'api_key': apidata._tnskey,
-        'data': json.dumps({
-            'objname': qname,
-            'photometry': '1'
-        })
-    }).encode('ascii')
-    req = urllib.request.Request(
-        'https://wis-tns.weizmann.ac.il/api/get/object', data=data)
-    trys = 0
-    objdict = None
-    while trys < 3 and not objdict:
-        try:
-            objdict = json.loads(urllib.request.urlopen(
-                req, timeout=30).read().decode('ascii'))[
-                    'data']['reply']
-        except KeyboardInterrupt:
-            raise
-        except Exception:
-            logger.info('API request failed for `{}`.'.format(name))
-            time.sleep(5)
-        trys = trys + 1
-
-    logger.info(objdict)
-
-    if (not objdict or 'objname' not in objdict or
-            not isinstance(objdict['objname'], str)):
-        logger.info('Object `{}` not found!'.format(name))
-        return False
-    objdict = sortOD(objdict)
-
-    if objdict.get('ra'):
-        new_event.add_quantity(ENTRY.RA, str(objdict['ra']), source=source)
-    if objdict.get('dec'):
-        new_event.add_quantity(ENTRY.DEC, str(objdict['dec']), source=source)
-    if objdict.get('redshift'):
-        new_event.add_quantity(
-            ENTRY.REDSHIFT, str(objdict['redshift']), source=source)
-    if objdict.get('internal_name'):
-        new_event.add_quantity(
-            ENTRY.ALIAS, str(objdict['internal_name']), source=source)
-
-    new_event.sanitize()
-    oentry = new_event._ordered(new_event)
-
-    outfile = os.path.join(
-        apidata._AC_PATH, apidata._CATS[cat][0], 'output',
-        apidata._CATS[cat][2], name + '.json')
-    if not os.path.exists(outfile):
-        entabbed_json_dump(
-            {name: oentry}, open(outfile, 'w'),
-            separators=(',', ':'))
-
-    # Then, load it into the API dicts.
-    if name not in apidata._catalogs[cat]:
-        apidata._catalogs[cat][name] = oentry
-        apidata._extras[cat][name] = oentry
-
-    # Record the extras dictionary for debugging.
-    entabbed_json_dump(apidata._extras, open('extras.json', 'w'),
-                       separators=(',', ':'))
-
-    add_event(cat, name)
-
-    return True
 
 
 def add_event(cat, event, convert_coords=True):
@@ -381,7 +321,7 @@ class Catalog(Resource):
                 request.remote_addr, catalog_name, event_name, quantity_name,
                 attribute_name, request.headers.get('User-Agent', '?')))
 
-        req_vals = request.get_json()
+        req_vals = request.get_json(silent=True)
 
         if not req_vals:
             req_vals = request.values
@@ -399,10 +339,6 @@ class Catalog(Resource):
             for line in loglines:
                 logger.info(line)
             return msg('atels_reloaded')
-
-        if event_name == 'new_tns':
-            result = handle_tns(quantity_name)
-            return msg('new_tns' if result else 'failed_tns', quantity_name)
 
         start = timer()
         result = self.retrieve(catalog_name, event_name,
@@ -487,7 +423,7 @@ class Catalog(Resource):
         qname = quantity_name
         aname = attribute_name
 
-        req_vals = request.get_json()
+        req_vals = request.get_json(silent=True)
 
         if not req_vals:
             req_vals = request.values
@@ -727,34 +663,47 @@ class Catalog(Resource):
                     return msg('event_not_found', event)
                 continue
             if full:
-                fpath = get_output_json_path(my_event, my_cat)
-                if not os.path.exists(fpath):
-                    for opt in alopts:
-                        fpath = None
-                        if opt == my_event:
-                            continue
-                        fpath = get_output_json_path(opt, my_cat)
-                        if os.path.exists(fpath):
-                            logger.info(
-                                '"{}.json" not found at expected path, '
-                                'found at "{}.json" instead.'.format(my_event, opt))
-                            break
-                        else:
-                            logger.info(
-                                '"{}.json" not found at expected path or '
-                                'alternative paths [{}].'
-                                .format(my_event, ', '.join(alopts)))
-                            return msg('file_not_found')
+                if apidata.use_sqlite:
+                    lookup_names = [my_event] + [opt[1] for opt in alopts]
+                    resolved_name, full_event = apidata._store.get_full_event_any_alias(
+                        my_cat, lookup_names
+                    )
+                    if full_event is None:
+                        return msg('file_not_found', my_event)
+                    fcatalogs[my_event] = full_event
+                    sources[my_event] = [
+                        x.get('bibcode', x.get('arxivid', x.get('name')))
+                        for x in fcatalogs[my_event].get('sources', [])
+                    ]
+                else:
+                    fpath = get_output_json_path(my_event, my_cat)
+                    if not os.path.exists(fpath):
+                        for opt in alopts:
+                            fpath = None
+                            if opt == my_event:
+                                continue
+                            fpath = get_output_json_path(opt, my_cat)
+                            if os.path.exists(fpath):
+                                logger.info(
+                                    '"{}.json" not found at expected path, '
+                                    'found at "{}.json" instead.'.format(my_event, opt))
+                                break
+                            else:
+                                logger.info(
+                                    '"{}.json" not found at expected path or '
+                                    'alternative paths [{}].'
+                                    .format(my_event, ', '.join(alopts)))
+                                return msg('file_not_found', my_event)
 
-                file_event = json.load(
-                    open(fpath, 'r'), object_pairs_hook=OrderedDict)
-                _, file_event[my_event] = file_event.popitem()
-                file_event[my_event]['catalog'] = my_cat
+                    file_event = json.load(
+                        open(fpath, 'r'), object_pairs_hook=OrderedDict)
+                    _, file_event[my_event] = file_event.popitem()
+                    file_event[my_event]['catalog'] = my_cat
 
-                fcatalogs.update(file_event)
-                sources[my_event] = [
-                    x.get('bibcode', x.get('arxivid', x.get('name')))
-                    for x in fcatalogs[my_event].get('sources')]
+                    fcatalogs.update(file_event)
+                    sources[my_event] = [
+                        x.get('bibcode', x.get('arxivid', x.get('name')))
+                        for x in fcatalogs[my_event].get('sources')]
             if qname is None:
                 if full:
                     edict[event] = fcatalogs.get(my_event, {})
@@ -1062,10 +1011,6 @@ api.add_resource(
     '/'.join(['', cn, en, qn]) + '/',
     '/'.join(['', cn, en, qn, an]),
     '/'.join(['', cn, en, qn, an]) + '/')
-
-# Load TNS API key.
-with open('tns.key', 'r') as f:
-    apidata._tnskey = f.read().splitlines()[0]
 
 load_cats()
 
