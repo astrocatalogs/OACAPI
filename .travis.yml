@@ -25,7 +25,7 @@ before_install:
 install:
   - conda update setuptools
   - conda config --add channels conda-forge
-  - conda install --yes astrocats astropy flask numpy six
+  - conda install --yes astropy flask numpy six
   - pip install flask_compress flask_restful
 
 script:

@@ -1,4 +1,3 @@
-astrocats
 numpy
 flask
 six

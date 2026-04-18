@@ -8,7 +8,6 @@ from collections import OrderedDict
 from timeit import default_timer as timer
 
 import numpy as np
-from astrocats.catalog.utils import is_integer, is_number
 from astropy import units as un
 from astropy.coordinates import SkyCoord as coord
 from astropy.coordinates import concatenate as coord_concat
@@ -20,6 +19,7 @@ except Exception:
     from werkzeug.contrib.fixers import ProxyFix
 
 from classes.apidata import ApiData
+from classes.compat import is_integer, is_number
 from flask_compress import Compress
 from flask_restful import Api, Resource
 from flask_cors import CORS
