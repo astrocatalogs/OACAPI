@@ -15,7 +15,7 @@ class EventRecord(Base):
     name = Column(String(255), nullable=False, index=True)
     normalized_name = Column(String(255), nullable=False, index=True)
     summary_json = Column(Text, nullable=False)
-    full_json = Column(Text, nullable=True)
+    event_path = Column(Text, nullable=True)
     ra_deg = Column(Float, nullable=True, index=True)
     dec_deg = Column(Float, nullable=True, index=True)
 

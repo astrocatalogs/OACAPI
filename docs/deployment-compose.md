@@ -27,6 +27,10 @@ cp .env.example .env
 docker compose --profile ingest run --rm ingest
 ```
 
+The sqlite snapshot stores summary/index metadata and file pointers only. Full
+event payloads are served directly from the mounted astrocatalog JSON files, so
+the deployment does not create a second large copy of event data.
+
 3. Start API and MCP services:
 
 ```bash

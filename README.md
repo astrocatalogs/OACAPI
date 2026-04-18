@@ -154,6 +154,9 @@ Use environment variables to choose the backend:
 For SQLite mode:
 
 - `OAC_DB_PATH` points to the sqlite file (default `/data/oacapi.db`).
+- SQLite stores summary/index data plus event file pointers only. Full event JSON
+  is loaded directly from the existing catalog `output/json` files, avoiding a
+  second copy of large event data.
 - Build the sqlite snapshot using:
 
 ```bash

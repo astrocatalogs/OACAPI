@@ -126,6 +126,9 @@ def get_filename(name):
 def get_output_json_path(name, cat):
     """Get full path to output JSON file."""
     if apidata.use_sqlite:
+        pointer = apidata._store.get_event_pointer(cat, name)
+        if pointer and pointer.get('event_path'):
+            return pointer['event_path']
         return None
     return os.path.join(apidata._AC_PATH, apidata._CATS[cat][0],
         'output', 'json', get_filename(name))
@@ -580,11 +583,7 @@ class Catalog(Resource):
 
             ename = '+'.join(list(sorted(set(ename_arr))))
 
-        if qname is None:
-            # Short circuit to full if keyword is present.
-            if full:
-                return self.retrieve_objects(
-                    catalog_name, event_name=ename, full=True)
+        if qname is None and not full:
             search_all = True
             if catalog_name not in apidata._CATS:
                 qname = '+'.join(list(set(sorted([
@@ -665,45 +664,39 @@ class Catalog(Resource):
             if full:
                 if apidata.use_sqlite:
                     lookup_names = [my_event] + [opt[1] for opt in alopts]
-                    resolved_name, full_event = apidata._store.get_full_event_any_alias(
+                    _, event_pointer = apidata._store.get_event_pointer_any_alias(
                         my_cat, lookup_names
                     )
-                    if full_event is None:
-                        return msg('file_not_found', my_event)
-                    fcatalogs[my_event] = full_event
-                    sources[my_event] = [
-                        x.get('bibcode', x.get('arxivid', x.get('name')))
-                        for x in fcatalogs[my_event].get('sources', [])
-                    ]
+                    fpath = event_pointer.get('event_path') if event_pointer else None
                 else:
                     fpath = get_output_json_path(my_event, my_cat)
-                    if not os.path.exists(fpath):
-                        for opt in alopts:
-                            fpath = None
-                            if opt == my_event:
-                                continue
-                            fpath = get_output_json_path(opt, my_cat)
-                            if os.path.exists(fpath):
-                                logger.info(
-                                    '"{}.json" not found at expected path, '
-                                    'found at "{}.json" instead.'.format(my_event, opt))
-                                break
-                            else:
-                                logger.info(
-                                    '"{}.json" not found at expected path or '
-                                    'alternative paths [{}].'
-                                    .format(my_event, ', '.join(alopts)))
-                                return msg('file_not_found', my_event)
+                if not fpath or not os.path.exists(fpath):
+                    for opt in alopts:
+                        if opt[1] == my_event:
+                            continue
+                        fpath = get_output_json_path(opt[1], my_cat)
+                        if fpath and os.path.exists(fpath):
+                            logger.info(
+                                '"{}.json" not found at expected path, '
+                                'found at "{}.json" instead.'.format(my_event, opt[1]))
+                            break
+                    else:
+                        logger.info(
+                            '"{}.json" not found at expected path or '
+                            'alternative paths [{}].'
+                            .format(my_event, ', '.join([x[1] for x in alopts])))
+                        return msg('file_not_found', my_event)
 
+                with open(fpath, 'r') as event_handle:
                     file_event = json.load(
-                        open(fpath, 'r'), object_pairs_hook=OrderedDict)
-                    _, file_event[my_event] = file_event.popitem()
-                    file_event[my_event]['catalog'] = my_cat
+                        event_handle, object_pairs_hook=OrderedDict)
+                _, file_event[my_event] = file_event.popitem()
+                file_event[my_event]['catalog'] = my_cat
 
-                    fcatalogs.update(file_event)
-                    sources[my_event] = [
-                        x.get('bibcode', x.get('arxivid', x.get('name')))
-                        for x in fcatalogs[my_event].get('sources')]
+                fcatalogs.update(file_event)
+                sources[my_event] = [
+                    x.get('bibcode', x.get('arxivid', x.get('name')))
+                    for x in fcatalogs[my_event].get('sources')]
             if qname is None:
                 if full:
                     edict[event] = fcatalogs.get(my_event, {})

@@ -26,6 +26,11 @@ class SqliteStore(object):
         """Create SQLAlchemy schema in the backing database."""
         Base.metadata.create_all(self.engine)
 
+    def reset_schema(self):
+        """Drop and recreate all tables for deterministic rebuilds."""
+        Base.metadata.drop_all(self.engine)
+        Base.metadata.create_all(self.engine)
+
     def clear_all(self):
         """Delete all rows from tables."""
         with Session(self.engine) as session:
@@ -102,8 +107,8 @@ class SqliteStore(object):
                 all_aliases.add(record.alias_raw.lower())
         return aliases, all_aliases
 
-    def get_full_event(self, catalog, event_name):
-        """Return full event JSON from DB if available."""
+    def get_event_pointer(self, catalog, event_name):
+        """Return event file pointer metadata for a catalog entry."""
         with Session(self.engine) as session:
             record = session.execute(
                 select(EventRecord).where(
@@ -112,17 +117,18 @@ class SqliteStore(object):
             ).scalar_one_or_none()
             if record is None:
                 return None
-            payload = record.full_json if record.full_json else record.summary_json
-            full_event = json.loads(payload, object_pairs_hook=OrderedDict)
-            full_event["catalog"] = catalog
-            return full_event
+            return {
+                "catalog": record.catalog,
+                "name": record.name,
+                "event_path": record.event_path,
+            }
 
-    def get_full_event_any_alias(self, catalog, candidate_event_names):
-        """Resolve first full event payload for candidate names."""
+    def get_event_pointer_any_alias(self, catalog, candidate_event_names):
+        """Resolve first event file pointer for candidate names."""
         for event_name in candidate_event_names:
-            event = self.get_full_event(catalog, event_name)
-            if event is not None:
-                return event_name, event
+            event_pointer = self.get_event_pointer(catalog, event_name)
+            if event_pointer is not None:
+                return event_name, event_pointer
         return None, None
 
     def coordinates(self):

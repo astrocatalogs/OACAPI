@@ -58,17 +58,11 @@ def parse_degrees(event):
     return float(c.ra.deg), float(c.dec.deg)
 
 
-def load_full_event(apidata, catalog, event_name):
-    """Load full event JSON if present, otherwise return None."""
+def event_json_path(apidata, catalog, event_name):
+    """Return absolute path to full event JSON for catalog/name."""
     catalog_meta = apidata._CATS[catalog]
     base_dir = os.path.join(apidata._AC_PATH, catalog_meta[0], "output", "json")
-    primary_path = os.path.join(base_dir, event_name.replace("/", "_") + ".json")
-    if not os.path.exists(primary_path):
-        return None
-    payload = read_json(primary_path)
-    _, event = payload.popitem()
-    event["catalog"] = catalog
-    return event
+    return os.path.join(base_dir, event_name.replace("/", "_") + ".json")
 
 
 def ingest_catalogs(apidata):
@@ -86,18 +80,16 @@ def ingest_catalogs(apidata):
             summary = OrderedDict(entry)
             summary["catalog"] = catalog
             ra_deg, dec_deg = parse_degrees(summary)
-            full_event = load_full_event(apidata, catalog, name)
+            full_event_path = event_json_path(apidata, catalog, name)
+            if not os.path.exists(full_event_path):
+                full_event_path = None
             event_rows.append(
                 {
                     "catalog": catalog,
                     "name": name,
                     "normalized_name": normalize_alias(name),
                     "summary_json": json.dumps(summary, separators=(",", ":"), ensure_ascii=False),
-                    "full_json": (
-                        json.dumps(full_event, separators=(",", ":"), ensure_ascii=False)
-                        if full_event is not None
-                        else None
-                    ),
+                    "event_path": full_event_path,
                     "ra_deg": ra_deg,
                     "dec_deg": dec_deg,
                 }
@@ -146,8 +138,7 @@ def main():
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
     store = SqliteStore(args.db_path)
-    store.create_schema()
-    store.clear_all()
+    store.reset_schema()
 
     event_rows, alias_rows = ingest_catalogs(apidata)
     LOGGER.info("Ingesting %d events and %d aliases", len(event_rows), len(alias_rows))
