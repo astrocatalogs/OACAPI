@@ -4,7 +4,7 @@ The Open Astronomy Catalogs website (**astrocats.space**, including the Open Sup
 
 Thank you to everyone who contributed data, code and feedback over the years.
 
-All of the catalog data and the software used to build them remain freely available in the [astrocatalogs GitHub organization](https://github.com/astrocatalogs). The repositories are listed below, grouped by type.
+All of the catalog data and the software used to build them remain freely available in the [astrocatalogs GitHub organization](https://github.com/astrocatalogs).
 
 If you used the `astroquery.oac` module, note that it depends on the retired API and is being removed from astroquery ([astropy/astroquery#3686](https://github.com/astropy/astroquery/issues/3686)).
 
