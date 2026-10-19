@@ -8,7 +8,7 @@ All of the catalog data and the software used to build them remain freely availa
 
 If you used the `astroquery.oac` module, note that it depends on the retired API and is being removed from astroquery ([astropy/astroquery#3686](https://github.com/astropy/astroquery/issues/3686)).
 
-<a><img src="https://img.shields.io/badge/shut%20down%20as%20of%2010%2F18%2F2026-red" alt="Shut down as of 10/18/2026"></a>
+<a name="shutdown-badge"><img src="https://img.shields.io/badge/shut%20down%20as%20of%2010%2F18%2F2026-red" alt="Shut down as of 10/18/2026"></a>
 # Open Astronomy Catalog API v1.0
 
 
