@@ -1,12 +1,9 @@
 # Open Astronomy Catalog API v1.0
 
-[![Website](https://img.shields.io/website-up-down-green-red/https/api.astrocats.space.svg?label=status)](https://github.com/astrocatalogs/OACAPI)
+![Shut down as of 10/18/2026](https://img.shields.io/badge/shut%20down%20as%20of%2010%2F18%2F2026-red)
 
 API usage over the last 7 days:
 
-[![Calls](https://img.shields.io/badge/dynamic/json.svg?label=successful%20queries&colorB=ff69b4&&query=$.count&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php&logo=quantopian&logoColor=ff69b4)](https://github.com/astrocatalogs/OACAPI)
-[![Uniques](https://img.shields.io/badge/dynamic/json.svg?label=unique%20users&colorB=bc44ee&query=$.unique&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php&logo=odnoklassniki&logoColor=bc44ee)](https://github.com/astrocatalogs/OACAPI)
-[![Trending](https://img.shields.io/badge/dynamic/json.svg?label=trending%20objects&colorB=550000&query=$.top5&uri=https%3A%2F%2Fastrocats.space%2Fapi-count.php&logo=koding&logoColor=550000)](https://github.com/astrocatalogs/OACAPI)
 
 The Open Astronomy Catalog API (OACAPI) offers a lightweight, simple way to access data available via the [Open Astronomy Catalogs](https://astrocats.space). The API is accessible via a route that works via any of the catalog domains,
 
