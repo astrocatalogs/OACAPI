@@ -1,6 +1,16 @@
+# The Open Astronomy Catalogs have been shut down
+
+The Open Astronomy Catalogs website (**astrocats.space**, including the Open Supernova, Tidal Disruption, Kilonova, Nova, Black Hole and Fast Stars catalogs and all of their subdomains) and the Open Astronomy Catalog API (**OACAPI**, `api.astrocats.space`) have been permanently retired and are no longer online.
+
+Thank you to everyone who contributed data, code and feedback over the years.
+
+All of the catalog data and the software used to build them remain freely available in the [astrocatalogs GitHub organization](https://github.com/astrocatalogs). The repositories are listed below, grouped by type.
+
+If you used the `astroquery.oac` module, note that it depends on the retired API and is being removed from astroquery ([astropy/astroquery#3686](https://github.com/astropy/astroquery/issues/3686)).
+
+<a><img src="https://img.shields.io/badge/shut%20down%20as%20of%2010%2F18%2F2026-red" alt="Shut down as of 10/18/2026"></a>
 # Open Astronomy Catalog API v1.0
 
-![Shut down as of 10/18/2026](https://img.shields.io/badge/shut%20down%20as%20of%2010%2F18%2F2026-red)
 
 API usage over the last 7 days:
 
